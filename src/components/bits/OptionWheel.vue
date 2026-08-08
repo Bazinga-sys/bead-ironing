@@ -346,11 +346,12 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 色块模式：每项左侧的细线（与 LineSidebar 的 marker 同风格，选中时 blend 到 accent） */
+/* 色块模式：每项右侧的细线（与 LineSidebar 的 marker 同风格，选中时 blend 到 accent） */
 .ow-marker {
   position: absolute;
   top: 50%;
-  right: calc(var(--ow-swatch-size) + 14px);
+  /* 色块右缘在 item 右缘（旋转原点），细线放到色块外侧：gap 14px + 线宽 34px */
+  right: -48px;
   width: 34px;
   height: 1px;
   transform: translateY(-50%);
