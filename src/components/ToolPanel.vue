@@ -60,21 +60,23 @@ function onFileChange(e: Event) {
 
 <template>
   <div class="sidebar-tools">
-    <LineSidebar
-      :items="items"
-      :active="active"
-      accent-color="#ef7d57"
-      text-color="#9a9282"
-      marker-color="#c9c2b4"
-      :marker-length="44"
-      :marker-gap="8"
-      :item-gap="22"
-      :font-size="1.05"
-      :proximity-radius="90"
-      :max-shift="24"
-      :smoothing="90"
-      @item-click="onItemClick"
-    />
+    <div class="menu-wrap">
+      <LineSidebar
+        :items="items"
+        :active="active"
+        accent-color="#ef7d57"
+        text-color="#3a3d42"
+        marker-color="#6c6c6c"
+        :marker-length="52"
+        :marker-gap="0"
+        :item-gap="26"
+        :font-size="1.2"
+        :proximity-radius="110"
+        :max-shift="18"
+        :smoothing="90"
+        @item-click="onItemClick"
+      />
+    </div>
     <input ref="fileInput" type="file" accept="image/*" class="file-input" @change="onFileChange">
   </div>
 </template>

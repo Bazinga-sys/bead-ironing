@@ -21,25 +21,27 @@ function onWheelChange(index: number) {
 
 <template>
   <div class="color-wheel-panel">
-    <OptionWheel
-      :items="items"
-      :swatch="true"
-      :eraser-index="0"
-      :default-selected="defaultSelected"
-      :selected="selected"
-      side="right"
-      :font-size="1.6"
-      :spacing="1.3"
-      :tilt="4"
-      :curve="0.6"
-      :blur="0.8"
-      :fade="0.1"
-      :min-opacity="0.05"
-      :smoothing="160"
-      :inset="100"
-      text-color="#9a9282"
-      active-color="#ef7d57"
-      @change="onWheelChange"
-    />
+    <div class="wheel-holder">
+      <OptionWheel
+        :items="items"
+        :swatch="true"
+        :eraser-index="0"
+        :default-selected="defaultSelected"
+        :selected="selected"
+        side="right"
+        :font-size="2.15"
+        :spacing="1.35"
+        :tilt="5"
+        :curve="0.7"
+        :blur="0.7"
+        :fade="0.07"
+        :min-opacity="0.08"
+        :smoothing="180"
+        :inset="92"
+        text-color="#9a9282"
+        active-color="#ef7d57"
+        @change="onWheelChange"
+      />
+    </div>
   </div>
 </template>

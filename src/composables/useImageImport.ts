@@ -44,7 +44,11 @@ export function importImage(file: File) {
     const offC = Math.floor((store.cols - pw) / 2)
     const offR = Math.floor((store.rows - ph) / 2)
     for (let r = 0; r < ph; r++) {
+      // 相机从近侧俯视棋盘：屏幕上的左右/上下与 grid 行列都相反（整图 180° 镜像），
+      // 导入时行列一起翻转，否则图纸在棋盘上会是倒置的
+      const gr = offR + (ph - 1 - r)
       for (let c = 0; c < pw; c++) {
+        const gc = offC + (pw - 1 - c)
         const i = (r * pw + c) * 4
         if (data[i + 3] < 128) continue
         const cr = data[i]
@@ -60,7 +64,7 @@ export function importImage(file: File) {
             best = k
           }
         }
-        store.grid[offR + r][offC + c].pixel = COLORS[best]
+        store.grid[gr][gc].pixel = COLORS[best]
       }
     }
 

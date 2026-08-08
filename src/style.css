@@ -1,10 +1,8 @@
 @import "tailwindcss";
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* 注意：不能在这里写未分层的 `* { margin:0; padding:0 }` 重置 ——
+   未分层样式的优先级高于 @layer 里的 Tailwind 工具类，会把 pl-/p-/m- 等全部压成 0。
+   Tailwind preflight 已在 @layer base 里提供等价重置。 */
 
 html,
 body,
@@ -40,7 +38,7 @@ body {
 
 /* ---------- 侧栏 ---------- */
 .sidebar {
-  background: #ffffff;
+  background: transparent;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -49,32 +47,54 @@ body {
 
 /* 左侧：工具按钮菜单（vue-bits LineSidebar） */
 .sidebar-left {
-  width: 150px;
+  width: 192px;
   border-right: 1px solid #e5e1d8;
   box-shadow: 2px 0 8px rgba(60, 55, 45, 0.06);
 }
 
 /* 右侧：颜色轮（vue-bits OptionWheel） */
 .sidebar-right {
-  width: 220px;
+  width: 236px;
   border-left: 1px solid #e5e1d8;
   box-shadow: -2px 0 8px rgba(60, 55, 45, 0.06);
 }
 
 .sidebar-tools {
-  padding: 18px 22px 12px 0;
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid #eeeae1;
+  overflow: hidden;
+}
+
+.menu-wrap {
+  /* 左侧留出 marker 细线（markerLength 52px）的显示空间 */
+  padding: 18px 16px 12px 20px;
   overflow: hidden;
 }
 
 .color-wheel-panel {
   flex: 1;
   display: flex;
+  flex-direction: column;
   min-height: 0;
   position: relative;
   overflow: hidden;
+}
+
+.wheel-holder {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+/* 轮盘锚定轴上的细轨道线，让色轮有依托感 */
+.wheel-holder::before {
+  content: '';
+  position: absolute;
+  left: calc(100% - 112px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, #e8e4d9 8%, #e8e4d9 92%, transparent);
 }
 
 .file-input {

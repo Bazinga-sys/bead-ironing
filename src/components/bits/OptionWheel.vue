@@ -249,7 +249,7 @@ const rootStyle = computed<CSSProperties>(
       '--ow-active-color': props.activeColor,
       '--ow-font-size': `${props.fontSize}rem`,
       '--ow-inset': `${props.inset}px`,
-      '--ow-swatch-size': `${Math.round(props.fontSize * 1.15 * remPx)}px`
+      '--ow-swatch-size': `${Math.round(props.fontSize * 1.1 * remPx)}px`
     }) as CSSProperties
 );
 
@@ -331,6 +331,11 @@ onUnmounted(() => {
     >
       <span
         v-if="swatch"
+        class="ow-marker"
+        aria-hidden="true"
+      />
+      <span
+        v-if="swatch"
         class="ow-swatch"
         :class="{ 'ow-swatch-eraser': index === eraserIndex }"
         :style="{ backgroundColor: index === eraserIndex ? '#3a3d42' : label }"
@@ -341,6 +346,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* 色块模式：每项左侧的细线（与 LineSidebar 的 marker 同风格，选中时 blend 到 accent） */
+.ow-marker {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--ow-swatch-size) + 14px);
+  width: 34px;
+  height: 1px;
+  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--ow-active-color, #ef7d57) calc(var(--ow-p, 0) * 100%), var(--ow-text-color, #9a9282));
+}
+
 /* 色块模式：圆形色块，选中/邻近高亮由 --ow-p（0..1 选中进度）驱动，与原版文字 color-mix 同思路 */
 .ow-swatch {
   display: inline-flex;
@@ -349,18 +365,20 @@ onUnmounted(() => {
   width: var(--ow-swatch-size);
   height: var(--ow-swatch-size);
   border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.4),
+    0 2px 6px rgba(60, 55, 45, 0.22);
   outline: 2px solid transparent;
-  outline-offset: 2px;
-  transform: scale(calc(1 + var(--ow-p, 0) * 0.14));
+  outline-offset: 3px;
+  transform: scale(calc(1 + var(--ow-p, 0) * 0.15));
   transition: outline-color 0.2s;
-  outline-color: color-mix(in srgb, var(--ow-active-color, #fff) calc(var(--ow-p, 0) * 100%), transparent);
+  outline-color: color-mix(in srgb, var(--ow-active-color, #ef7d57) calc(var(--ow-p, 0) * 100%), transparent);
 }
 
 /* 橡皮项：深底 + 白色 ✕，与普通色块区分 */
 .ow-swatch-eraser {
-  border: 2px dashed rgba(255, 255, 255, 0.6);
+  border: 2px dashed rgba(255, 255, 255, 0.65);
   color: #fff;
   font-size: calc(var(--ow-swatch-size) * 0.5);
   font-weight: 600;

@@ -199,7 +199,7 @@ onUnmounted(() => {
           class="top-1/2 left-[calc(-1*var(--marker-length)-var(--marker-gap))] absolute w-(--marker-length) h-px origin-left bg-[color-mix(in_srgb,var(--accent-color)_calc(var(--effect,0)*100%),var(--marker-color))] transform-[translateY(-50%)_scaleX(calc(0.7+var(--effect,0)*0.5))]"
         />
         <span
-          class="inline-flex relative items-baseline [font-size:var(--font-size)] leading-[1.2] transform-[translateX(calc(var(--effect,0)*var(--max-shift)))] text-[color-mix(in_srgb,var(--accent-color)_calc(var(--effect,0)*100%),var(--text-color))]"
+          class="inline-flex relative items-baseline font-semibold [font-size:var(--font-size)] leading-[1.2] transform-[translateX(calc(var(--effect,0)*var(--max-shift)))] text-[color-mix(in_srgb,var(--accent-color)_calc(var(--effect,0)*100%),var(--text-color))]"
         >
           <span v-if="showIndex" class="opacity-[calc(0.55+var(--effect,0)*0.45)] mr-[0.6rem] font-mono text-[0.85em]">
             {{ String(index + 1).padStart(2, '0') }}
