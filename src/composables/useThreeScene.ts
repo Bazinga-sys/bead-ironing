@@ -146,9 +146,12 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
     const q = new THREE.Quaternion()
 
     if (hc > 0) {
-      // 未熔融空心珠：塑料（clearcoat 高光 + 环境反射）
+      // 未熔融空心珠：半透明塑料（清漆层高光 + 透射透光 + 环境反射）
       const mat = new THREE.MeshPhysicalMaterial({
-        roughness: 0.35, metalness: 0, clearcoat: 0.35, clearcoatRoughness: 0.25, envMapIntensity: 1.2,
+        roughness: 0.3, metalness: 0,
+        clearcoat: 1, clearcoatRoughness: 0.12,
+        transmission: 0.6, ior: 1.5, thickness: 0.9,
+        envMapIntensity: 1.4,
       })
       const mesh = new THREE.InstancedMesh(hollowGeo, mat, hc)
       mesh.castShadow = true
@@ -176,9 +179,12 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
     }
 
     if (fc > 0) {
-      // 熔融扁珠：更光滑（熨烫后表面变平顺）
+      // 熔融扁珠：更光滑的半透明塑料片（熨烫后表面平顺，清漆层更亮）
       const mat = new THREE.MeshPhysicalMaterial({
-        roughness: 0.25, metalness: 0, clearcoat: 0.4, clearcoatRoughness: 0.2, envMapIntensity: 1.3,
+        roughness: 0.22, metalness: 0,
+        clearcoat: 1, clearcoatRoughness: 0.1,
+        transmission: 0.45, ior: 1.5, thickness: 0.8,
+        envMapIntensity: 1.5,
       })
       const mesh = new THREE.InstancedMesh(filledGeo, mat, fc)
       mesh.castShadow = true

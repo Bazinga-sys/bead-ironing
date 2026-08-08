@@ -65,6 +65,7 @@ export function importImage(file: File) {
     }
 
     switchMode('design')
+    store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
     showStatus('导入完成：拼豆图纸，可对照放豆')
     URL.revokeObjectURL(url)
   }

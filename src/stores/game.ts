@@ -1,10 +1,17 @@
 import { computed, reactive } from 'vue'
-import type { Cell, IronProgress, Mode, MouseState, SavedBoard } from '../types'
+import type { Cell, IronProgress, Mode, MouseState, SavedBoard, ViewState } from '../types'
 import { CELL, COLORS, DISPLAY_CELL } from '../utils/color'
 import { rotForId } from '../utils/rotation'
 import { renderThumb } from '../utils/thumbnail'
 
 const STORAGE_KEY = 'bead-iron.savedBoards'
+
+/** 无限画布缩放范围与网格上限（上限防止极端缩放下内存/遍历失控） */
+export const MIN_ZOOM = 0.2
+export const MAX_ZOOM = 10
+export const MAX_GRID = 200
+/** 每格显示像素低于该值时隐藏网格线/定位点（缩小时画面干净且省性能） */
+export const MIN_GRID_LINE = 12
 
 /** 重新生成缩略图（当前 renderThumb 规则），用于旧数据迁移 */
 function regenerateThumb(grid: Cell[][]): string {
@@ -89,8 +96,11 @@ export const store = reactive({
   cols: autosave?.cols ?? 30,
   rows: autosave?.rows ?? 30,
   grid: (autosave?.grid ?? createGrid(30, 30)) as Cell[][],
+  /** 网格内容版本号：任何珠子/图纸变更时 +1，供画布静态层缓存失效检测 */
+  gridVersion: 0,
   mode: 'design' as Mode,
-  zoom: 1,
+  /** 无限画布视口：世界坐标左上角 + 显示倍率（滚轮以鼠标为锚缩放 / 拖拽平移） */
+  view: { x: 0, y: 0, zoom: 1 } as ViewState,
   mouse: { x: -1, y: -1, down: false } as MouseState,
   selectedColor: COLORS[0],
   isEraser: false,
@@ -137,15 +147,29 @@ function hasContent(): boolean {
   return store.grid.some((row) => row.some((c) => c.color !== null || c.pixel !== null))
 }
 
-/** 按容器尺寸重算行列数，尺寸变化时重建网格（已有内容则保留，防止误触 resize 清空） */
-export function setupGrid(w: number, h: number) {
-  const nc = Math.max(10, Math.floor(w / DISPLAY_CELL))
-  const nr = Math.max(10, Math.floor(h / DISPLAY_CELL))
-  if (nc === store.cols && nr === store.rows && store.grid.length > 0) return
-  if (hasContent()) return
+/**
+ * 无限画布：网格按需扩容到覆盖视口（只增不减、保留已有内容，在右/下侧追加空行/列），
+ * 供滚轮缩放 / 平移 / 窗口变化时保证视口内有格子可放豆。
+ */
+export function expandGridKeep(minCols: number, minRows: number) {
+  const nc = Math.min(MAX_GRID, Math.max(store.cols, Math.ceil(minCols)))
+  const nr = Math.min(MAX_GRID, Math.max(store.rows, Math.ceil(minRows)))
+  if (nc === store.cols && nr === store.rows) return
+  const g = createGrid(nc, nr)
+  for (let r = 0; r < store.rows; r++)
+    for (let c = 0; c < store.cols; c++) g[r][c] = store.grid[r][c]
+  store.grid = g
   store.cols = nc
   store.rows = nr
-  store.grid = createGrid(nc, nr)
+  store.gridVersion++ // 网格线数量变化，静态层缓存失效
+}
+
+/** 窗口/容器尺寸变化 → 按当前缩放把网格扩容到覆盖视口（内容坐标不变，只追加空行/列） */
+export function setupGrid(w: number, h: number) {
+  expandGridKeep(
+    Math.ceil(w / (DISPLAY_CELL * store.view.zoom)),
+    Math.ceil(h / (DISPLAY_CELL * store.view.zoom)),
+  )
 }
 
 /** 图片导入时按需扩容画布（调用方随后会覆盖全部格子） */
@@ -163,24 +187,29 @@ export function getCellAt(x: number, y: number): { r: number; c: number } | null
   return r < 0 || r >= store.rows || c < 0 || c >= store.cols ? null : { r, c }
 }
 
-/** 画布坐标放置珠子 / 橡皮擦除 */
+/** 画布坐标放置珠子 / 橡皮擦除（内容实际变化时递增 gridVersion，供缓存失效） */
 export function placeBead(x: number, y: number) {
   const cell = getCellAt(x, y)
   if (!cell) return
   const target = store.grid[cell.r][cell.c]
   if (store.isEraser) {
+    if (target.color === null) return
     target.color = null
     target.melt = 0
   } else {
+    if (target.color === store.selectedColor) return
     target.color = store.selectedColor
     target.melt = 0
   }
+  store.gridVersion++
 }
 
 export function eraseCell(r: number, c: number) {
   const cell = store.grid[r][c]
+  if (cell.color === null) return
   cell.color = null
   cell.melt = 0
+  store.gridVersion++
 }
 
 export function clearAll() {
@@ -190,6 +219,7 @@ export function clearAll() {
       cell.melt = 0
       cell.pixel = null
     }
+  store.gridVersion++
   switchMode('design')
 }
 
@@ -199,8 +229,14 @@ export function switchMode(m: Mode) {
   if (m !== 'design') store.panMode = false
   // 切回设计模式：全部珠子恢复未熔融
   if (m === 'design') {
+    let touched = false
     for (const row of store.grid)
-      for (const cell of row) cell.melt = 0
+      for (const cell of row)
+        if (cell.melt > 0) {
+          cell.melt = 0
+          touched = true
+        }
+    if (touched) store.gridVersion++
   }
   showStatus(
     m === 'design' ? '点击/拖拽放置拼豆' : m === 'ironing' ? '按住拖动来熨烫' : '拖拽旋转 3D 视角',
@@ -254,6 +290,7 @@ export function loadBoard(id: string) {
   store.cols = board.cols
   store.rows = board.rows
   store.grid = board.grid.map((row) => row.map((cell) => ({ ...cell })))
+  store.gridVersion++
   store.mode = 'design' // 直接赋值：避免 switchMode 清零 melt
   store.showBoardPanel = false
   showStatus(`已载入「${board.name}」`)

@@ -38,7 +38,7 @@ body {
 
 /* ---------- 侧栏 ---------- */
 .sidebar {
-  width: 88px;
+  width: 112px;
   background: #ffffff;
   border-right: 1px solid #e5e1d8;
   box-shadow: 2px 0 8px rgba(60, 55, 45, 0.06);
@@ -56,101 +56,13 @@ body {
   border-bottom: 1px solid #eeeae1;
 }
 
-.mode-btn {
-  padding: 7px 6px;
-  border: 1px solid #ddd8cd;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #4a4d52;
-  font-family: inherit;
-  font-size: 13px;
-  cursor: pointer;
+/* PrimeVue 组件在窄侧栏中的适配：全宽 + 居中小号文字 */
+.sidebar-tools .p-button,
+.sidebar-tools .p-togglebutton {
   width: 100%;
-  text-align: center;
-  line-height: 1.3;
-  box-shadow: 0 1px 2px rgba(60, 55, 45, 0.08);
-  transition: background 0.12s, box-shadow 0.12s, transform 0.06s;
-}
-
-.mode-btn:hover:not(:disabled) {
-  background: #f2f5fa;
-  box-shadow: 0 2px 4px rgba(60, 55, 45, 0.12);
-}
-
-.mode-btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.mode-btn.active {
-  background: #4a90d9;
-  border-color: #3a7dc4;
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(74, 144, 217, 0.35);
-}
-
-.mode-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.btn-import {
-  background: #eaf6ee;
-  border-color: #bfe3ca;
-  color: #2e7d4f;
-}
-
-.btn-import:hover:not(:disabled) {
-  background: #d7efdf;
-}
-
-.btn-import.active {
-  background: #34a853;
-  border-color: #2c9148;
-}
-
-.btn-save {
-  background: #fdf4e3;
-  border-color: #eed9a8;
-  color: #9a6b1c;
-}
-
-.btn-save:hover:not(:disabled) {
-  background: #fbedcf;
-}
-
-.btn-save.active {
-  background: #e6a23c;
-  border-color: #d18f2b;
-}
-
-.btn-panel {
-  background: #eaf5f6;
-  border-color: #c3e4e8;
-  color: #1f7a84;
-}
-
-.btn-panel:hover:not(:disabled) {
-  background: #d9eef1;
-}
-
-.btn-panel.active {
-  background: #2a8a8a;
-  border-color: #247575;
-}
-
-.btn-clear {
-  background: #fbecec;
-  border-color: #efc6c6;
-  color: #b3372f;
-}
-
-.btn-clear:hover:not(:disabled) {
-  background: #f8dcdc;
-}
-
-.btn-clear.active {
-  background: #d9534f;
-  border-color: #c44541;
+  justify-content: center;
+  padding-inline: 0.5rem;
+  font-size: 13px;
 }
 
 .file-input {
@@ -236,28 +148,14 @@ body {
 .scroll-wrap {
   position: absolute;
   inset: 0;
-  overflow: auto;
-  display: flex;
-}
-
-.scroll-wrap::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.scroll-wrap::-webkit-scrollbar-track {
-  background: #f5f3ee;
-}
-
-.scroll-wrap::-webkit-scrollbar-thumb {
-  background: #d9d5cc;
-  border-radius: 5px;
+  overflow: hidden; /* 无限画布：平移/缩放由视口自绘，不使用原生滚动条 */
 }
 
 .canvas-pixel {
   display: block;
+  width: 100%;
+  height: 100%;
   background: #ffffff;
-  margin: auto;
   cursor: crosshair;
 }
 
@@ -288,30 +186,6 @@ body {
   display: block;
 }
 
-/* ---------- 状态提示 ---------- */
-.status-bar {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #ffffff;
-  border: 1px solid #e5e1d8;
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(60, 55, 45, 0.12);
-  padding: 8px 18px;
-  font-size: 13px;
-  color: #3a3d42;
-  z-index: 50;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-  white-space: nowrap;
-}
-
-.status-bar.show {
-  opacity: 1;
-}
-
 /* ---------- 熨烫进度 ---------- */
 .iron-progress {
   display: none;
@@ -340,20 +214,21 @@ body {
 }
 
 .progress-bar {
+  position: relative;
+  height: 14px;
+}
+
+/* PrimeVue ProgressBar 适配：高度/圆角/填充色（填充色由 IronProgress 注入 --iron-fill） */
+.iron-progress .p-progressbar {
   height: 14px;
   background: #f0ede5;
   border: 1px solid #e5e1d8;
   border-radius: 7px;
-  position: relative;
-  overflow: hidden;
 }
 
-.progress-fill {
-  height: 100%;
-  width: 0%;
-  background: #4a90d9;
+.iron-progress .p-progressbar-value {
+  background: var(--iron-fill, #41a6f6);
   border-radius: 7px;
-  transition: width 0.1s;
 }
 
 .progress-zone {
@@ -365,6 +240,7 @@ body {
   border-left: 1px dashed #34a853;
   border-right: 1px dashed #34a853;
   pointer-events: none;
+  z-index: 2;
 }
 
 /* ---------- 作品墙（冰箱贴） ---------- */
@@ -399,25 +275,6 @@ body {
   font-size: 15px;
   color: #4a4d52;
   letter-spacing: 2px;
-}
-
-.board-panel-close {
-  width: 30px;
-  height: 30px;
-  background: #ffffff;
-  border: 1px solid #ddd8cd;
-  border-radius: 8px;
-  color: #6b6f76;
-  font-family: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(60, 55, 45, 0.12);
-}
-
-.board-panel-close:hover {
-  background: #fbecec;
-  color: #b3372f;
 }
 
 .board-panel-empty {

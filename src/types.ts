@@ -16,6 +16,13 @@ export interface MouseState {
   down: boolean
 }
 
+/** 无限画布视口：左上角世界坐标（逻辑像素）+ 显示倍率（1 = 每格 DISPLAY_CELL 显示像素） */
+export interface ViewState {
+  x: number
+  y: number
+  zoom: number
+}
+
 export interface IronProgress {
   avg: number
   fused: number

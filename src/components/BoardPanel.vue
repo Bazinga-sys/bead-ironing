@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { Button } from 'primevue'
 import { deleteBoard, loadBoard, setBoardPanel, store, updateBoard } from '../stores/game'
 import type { SavedBoard } from '../types'
 
@@ -177,7 +178,16 @@ onUnmounted(() => {
   <div ref="panelEl" class="board-panel" :class="{ show: store.showBoardPanel }">
     <header class="board-panel-head">
       <h2 class="board-panel-title">作 品 墙</h2>
-      <button class="board-panel-close" @click="setBoardPanel(false)">✕</button>
+      <Button
+        variant="outlined"
+        severity="secondary"
+        rounded
+        size="small"
+        class="board-panel-close"
+        icon="pi pi-times"
+        aria-label="关闭作品墙"
+        @click="setBoardPanel(false)"
+      />
     </header>
 
     <p v-if="store.savedBoards.length === 0" class="board-panel-empty">
