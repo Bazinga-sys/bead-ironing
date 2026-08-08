@@ -5,7 +5,6 @@ import BoardPanel from './BoardPanel.vue'
 import IronProgress from './IronProgress.vue'
 import PixelCanvas from './PixelCanvas.vue'
 import StatusBar from './StatusBar.vue'
-import View3D from './View3D.vue'
 
 const root = useTemplateRef<HTMLDivElement>('root')
 let resizeTimer: ReturnType<typeof setTimeout> | undefined
@@ -40,7 +39,6 @@ onUnmounted(() => {
 <template>
   <div ref="root" class="canvas-wrap">
     <PixelCanvas />
-    <View3D />
     <BoardPanel />
     <StatusBar />
     <IronProgress />

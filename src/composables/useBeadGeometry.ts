@@ -17,8 +17,7 @@ export const BEAD_HEIGHT = 1.35
 
 /**
  * 空心珠几何体（EVA 空心短圆筒）：圆环拉伸（高细分、圆润边缘），俯视可见贯穿珠孔。
- * 孔径占比随豆子规格变化。拼豆棋盘（useThreeBoard）与 3D 预览（useThreeScene）共用，
- * 保证两个视图的珠子形态完全一致。
+ * 孔径占比随豆子规格变化。拼豆棋盘（useThreeBoard）专用，
  */
 export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeGeometry {
   const ringShape = new THREE.Shape()
@@ -42,7 +41,6 @@ export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeG
 /**
  * 熔融扁珠几何体：圆角矩形拉伸，中心保留小孔——EVA 熨烫后孔洞不容易完全消失，
  * 只略微收缩（残留孔随 instance 的 y 缩放一起压扁）。
- * 拼豆棋盘与 3D 预览共用。
  */
 export function createFilledBeadGeometry(_size: BeadSize = 'big'): THREE.ExtrudeGeometry {
   const rw = 0.95

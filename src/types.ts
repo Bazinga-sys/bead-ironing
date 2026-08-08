@@ -8,7 +8,7 @@ export interface Cell {
   pixel: string | null
 }
 
-export type Mode = 'design' | 'ironing' | 'view3d'
+export type Mode = 'design' | 'ironing'
 
 /** 豆子规格：大豆 5mm（外径 5、孔径 ~2.5）／迷你豆 2.6mm（外径 2.6、孔径 ~1.5） */
 export type BeadSize = 'big' | 'mini'

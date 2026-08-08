@@ -52,10 +52,10 @@ onUnmounted(() => {
     ref="wrap"
     class="scroll-wrap"
     :class="{
-      'canvas-hidden': store.mode === 'view3d',
       'iron-cursor': store.mode === 'ironing',
       'pan-mode': store.mode === 'design' && store.panMode,
       'pan-dragging': store.mode === 'design' && store.panMode && store.mouse.down,
+      'view-mode': store.mode === 'design' && store.viewMode,
     }"
   />
 </template>

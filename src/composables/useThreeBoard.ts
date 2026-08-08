@@ -25,7 +25,7 @@ export interface ThreeBoardHandle {
   dispose(): void
 }
 
-/** 固定俯视角（视线与水平面夹角，°）与相机 fov */
+/** 初始俯视角（视线与水平面夹角，°）与相机 fov */
 const TILT_DEG = 55
 const FOV = 50
 /** 缩放范围（1 = 每格 DISPLAY_CELL 显示像素） */
@@ -33,10 +33,14 @@ const MIN_SCALE = 0.25
 const MAX_SCALE = 12
 /** 每格显示像素低于该值时隐藏网格线 */
 const MIN_GRID_LINE_PX = 10
+/** 视角旋转灵敏度（rad/px）与俯仰角可调范围（10°~85°，初始 55°） */
+const ROT_SPEED = 0.006
+const PITCH_MIN = (10 * Math.PI) / 180
+const PITCH_MAX = (85 * Math.PI) / 180
 
 /**
- * 拼豆棋盘渲染器：three.js 实时光照（与 3D 预览同款塑料材质），
- * 固定倾斜俯视角 + 无限画布（滚轮锚点缩放 / 拖拽平移，网格按需扩容）。
+ * 拼豆棋盘渲染器：three.js 实时光照（EVA 哑光塑料材质），
+ * 倾斜俯视角（可旋转）+ 无限画布（滚轮锚点缩放 / 拖拽平移，网格按需扩容）。
  * 世界坐标：X = 列 c、Z = 行 r、Y 向上，格子 (r,c) 中心 = (c, 0, r)。
  */
 export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
@@ -101,7 +105,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   gridLines.position.y = 0.005
   scene.add(gridLines)
 
-  // 珠子几何体与 EVA 哑光材质（与 3D 预览共用同款，雾面无高光、轻微透光）
+  // 珠子几何体与 EVA 哑光材质（雾面无高光、轻微透光）
   let hollowGeo = createHollowBeadGeometry(store.beadSize)
   let filledGeo = createFilledBeadGeometry(store.beadSize)
   const hollowMat = createEvaHollowMaterial()
@@ -136,6 +140,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   let scale = 1
   let baseDist = 50
   const center = { x: 0, z: 0 }
+  // 视角（球坐标）：yaw 绕 Y 轴（0 = 正 +Z 侧看），pitch 与水平面夹角。初始固定 55° 俯视
+  let yaw = Math.PI
+  let pitch = (TILT_DEG * Math.PI) / 180
 
   /** 珠子 instance 索引：key = r×MAX_GRID + c → (mesh, idx)，供熨烫局部更新 */
   const beadIndex = new Map<number, { mesh: THREE.InstancedMesh; idx: number }>()
@@ -191,21 +198,29 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     expandGridKeep(Math.ceil(maxX) + 2, Math.ceil(maxZ) + 2)
   }
 
-  /** 相机按当前 center/scale 定位 */
+  /** 网格线显隐：完成（展示）模式隐藏，设计模式按缩放后每格的显示密度决定 */
+  function updateGridLines() {
+    gridLines.visible = !store.viewMode && DISPLAY_CELL * scale >= MIN_GRID_LINE_PX
+  }
+
+  /** 相机按当前 center/scale/yaw/pitch 定位（yaw=π、pitch=55° 时与初始固定视角一致） */
   function applyView() {
-    const T = (TILT_DEG * Math.PI) / 180
-    const H = (baseDist * Math.sin(T)) / scale
-    const d = (baseDist * Math.cos(T)) / scale
-    camera.position.set(center.x, H, center.z - d)
+    const r = baseDist / scale
+    const cp = Math.cos(pitch)
+    camera.position.set(
+      center.x + r * cp * Math.sin(yaw),
+      r * Math.sin(pitch),
+      center.z + r * cp * Math.cos(yaw),
+    )
     controls.target.set(center.x, 0, center.z)
     controls.update()
     // 主光跟随注视中心，保持一致的阴影方向与覆盖范围
     key.position.set(center.x + 60, 120, center.z + 40)
     key.target.position.set(center.x, 0, center.z)
-    gridLines.visible = DISPLAY_CELL * scale >= MIN_GRID_LINE_PX
+    updateGridLines()
   }
 
-  /** 写入单个珠子 instance 的矩阵/颜色（与 3D 预览相同的熔融形态公式，按豆子规格缩放）。
+  /** 写入单个珠子 instance 的矩阵/颜色（熔融形态公式，按豆子规格缩放）。
    *  网格线在整数坐标，格子 (r,c) 的方格中心 = (c+0.5, r+0.5)——拼豆放在格子中间，一格一颗。 */
   function writeInstance(mesh: THREE.InstancedMesh, idx: number, r: number, c: number, melt: number) {
     const { s, tol } = BEAD_SCALE[size]
@@ -310,9 +325,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     scene.add(patternMesh)
   }
 
-  /* ---------- 交互：放豆 / 擦除 / 悬停 / 锚点缩放 / 拖拽平移 ---------- */
+  /* ---------- 交互：放豆 / 擦除 / 悬停 / 锚点缩放 / 拖拽平移 / 视角旋转 ---------- */
 
   let panDrag: { sx: number; sy: number; cx: number; cz: number } | null = null
+  let rotDrag: { sx: number; sy: number; yaw0: number; pitch0: number } | null = null
 
   function onPointerDown(e: PointerEvent) {
     if (e.button === 2) return
@@ -323,7 +339,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     store.mouse.y = p.z * CELL
     store.mouse.down = true
     if (store.mode !== 'design' || e.button !== 0) return
-    if (store.panMode) {
+    if (store.viewMode) {
+      // 视角工具：左键拖拽旋转相机（panMode 与之互斥，由侧栏开关保证）
+      rotDrag = { sx: e.clientX, sy: e.clientY, yaw0: yaw, pitch0: pitch }
+    } else if (store.panMode) {
       panDrag = { sx: e.clientX, sy: e.clientY, cx: center.x, cz: center.z }
     } else {
       placeBead(p.x * CELL, p.z * CELL)
@@ -336,6 +355,17 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     if (!p) return
     store.mouse.x = p.x * CELL
     store.mouse.y = p.z * CELL
+    if (rotDrag) {
+      // 视角拖拽（棋盘跟随鼠标的直觉方向）：水平右拖绕 Y 轴右转，向下拖视角变高更俯视
+      yaw = rotDrag.yaw0 + (e.clientX - rotDrag.sx) * ROT_SPEED
+      pitch = Math.max(
+        PITCH_MIN,
+        Math.min(PITCH_MAX, rotDrag.pitch0 + (e.clientY - rotDrag.sy) * ROT_SPEED),
+      )
+      applyView()
+      ensureGridFitsViewport()
+      return
+    }
     if (panDrag) {
       const { w, h } = viewportSize()
       const pl = groundPoint(-1, 0)!
@@ -351,15 +381,17 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       return
     }
     // 设计模式按住拖拽连续放豆/擦除（placeBead 仅在内容实际变化时递增 gridVersion）
-    if (store.mode === 'design' && store.mouse.down) placeBead(p.x * CELL, p.z * CELL)
+    if (store.mode === 'design' && !store.viewMode && store.mouse.down) placeBead(p.x * CELL, p.z * CELL)
   }
 
   function onPointerUp() {
+    rotDrag = null
     panDrag = null
     store.mouse.down = false
   }
 
   function onLeave() {
+    rotDrag = null
     panDrag = null
     store.mouse.x = -1
     store.mouse.y = -1
@@ -382,7 +414,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     center.x = p.x + (center.x - p.x) * r
     center.z = p.z + (center.z - p.z) * r
     controls.target.set(center.x, 0, center.z)
-    gridLines.visible = DISPLAY_CELL * scale >= MIN_GRID_LINE_PX
+    updateGridLines()
     ensureGridFitsViewport()
   }
 
@@ -398,7 +430,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   /* ---------- 每帧 ---------- */
 
   function updateHover() {
-    if (store.mode !== 'design') {
+    if (store.mode !== 'design' || store.viewMode) {
       hoverBox.visible = false
       return
     }
@@ -424,6 +456,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     raf = requestAnimationFrame(animate)
     updateIronOverlay()
     updateHover()
+    updateGridLines() // 完成模式开关即时隐藏/恢复网格线
     controls.update()
     renderer.render(scene, camera)
   }

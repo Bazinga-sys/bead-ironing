@@ -102,6 +102,8 @@ export const store = reactive({
   isEraser: false,
   /** 拖拽工具：开启后左键拖动画布平移（设计模式），关闭时照常放豆 */
   panMode: false,
+  /** 完成（展示）模式：隐藏棋盘线，左键拖拽旋转查看成品；关闭时恢复放豆 */
+  viewMode: false,
   status: '',
   statusVisible: false,
   progress: {
@@ -112,7 +114,7 @@ export const store = reactive({
   resizeTick: 0,
   /** 已保存到作品面板的成品（localStorage 持久化） */
   savedBoards: loadSavedBoards(),
-  /** 作品面板显示开关（仿 three-container 的 .show 切换） */
+  /** 作品面板显示开关（覆盖在画布上） */
   showBoardPanel: false,
   /** 本次启动从自动存档恢复了上次进度（用于提示） */
   restoredFromAutosave: autosave !== null,
@@ -121,10 +123,6 @@ export const store = reactive({
 /** 存在任意珠子（熨烫按钮可用） */
 export const hasBeads = computed(() =>
   store.grid.some((row) => row.some((c) => c.color !== null)),
-)
-/** 存在已开始熔融的珠子（3D 按钮可用） */
-export const hasMelt = computed(() =>
-  store.grid.some((row) => row.some((c) => c.color !== null && c.melt > 0.01)),
 )
 
 let statusTimer: ReturnType<typeof setTimeout> | undefined
@@ -222,8 +220,11 @@ export function clearAll() {
 
 export function switchMode(m: Mode) {
   store.mode = m
-  // 拖拽工具只在设计模式使用，切走时关闭
-  if (m !== 'design') store.panMode = false
+  // 拖拽/视角工具只在设计模式使用，切走时关闭
+  if (m !== 'design') {
+    store.panMode = false
+    store.viewMode = false
+  }
   // 切回设计模式：全部珠子恢复未熔融
   if (m === 'design') {
     let touched = false
@@ -235,9 +236,7 @@ export function switchMode(m: Mode) {
         }
     if (touched) store.gridVersion++
   }
-  showStatus(
-    m === 'design' ? '点击/拖拽放置拼豆' : m === 'ironing' ? '按住拖动来熨烫' : '拖拽旋转 3D 视角',
-  )
+  showStatus(m === 'design' ? '点击/拖拽放置拼豆' : '按住拖动来熨烫')
 }
 
 export function selectColor(hex: string) {

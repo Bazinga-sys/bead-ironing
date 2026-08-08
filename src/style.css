@@ -159,10 +159,6 @@ body {
   touch-action: none;
 }
 
-.scroll-wrap.canvas-hidden {
-  display: none;
-}
-
 .scroll-wrap.iron-cursor canvas {
   cursor: none;
 }
@@ -171,19 +167,12 @@ body {
   cursor: grab;
 }
 
+.scroll-wrap.view-mode canvas {
+  cursor: grab;
+}
+
 .scroll-wrap.pan-mode.pan-dragging canvas {
   cursor: grabbing;
-}
-
-.three-container {
-  position: absolute;
-  inset: 0;
-  display: none;
-  z-index: 5;
-}
-
-.three-container.show {
-  display: block;
 }
 
 /* ---------- 熨烫进度 ---------- */
