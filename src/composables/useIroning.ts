@@ -1,8 +1,9 @@
 import { store } from '../stores/game'
-import { BURN, CELL, FUSE_MAX, FUSE_MIN, IRON_RADIUS, IRON_SPEED } from '../utils/color'
+import { burnAt, CELL, FUSE_MAX, FUSE_MIN, IRON_RADIUS, IRON_SPEED } from '../utils/color'
 
 /** 统计并刷新熨烫进度（写入 store.progress，供 IronProgress 组件展示） */
 function updateIronProgress() {
+  const burn = burnAt(store.beadSize)
   let total = 0
   let fused = 0
   let burned = 0
@@ -14,7 +15,7 @@ function updateIronProgress() {
       count++
       total += cell.melt
       if (cell.melt >= FUSE_MIN && cell.melt <= FUSE_MAX) fused++
-      else if (cell.melt > BURN) burned++
+      else if (cell.melt > burn) burned++
     }
   }
   if (count === 0) return
@@ -24,7 +25,7 @@ function updateIronProgress() {
   store.progress.fused = fused
   store.progress.burned = burned
   store.progress.fillColor =
-    avg > BURN ? '#b13e53' : avg > FUSE_MAX ? '#ffcd75' : avg > FUSE_MIN ? '#38b764' : '#41a6f6'
+    avg > burn ? '#b13e53' : avg > FUSE_MAX ? '#ffcd75' : avg > FUSE_MIN ? '#38b764' : '#41a6f6'
   store.progress.label =
     burned > 0
       ? `!! ${burned} BURNED ${fused}/${count}`
@@ -53,6 +54,8 @@ export function useIroning(render: () => void) {
     last = ts
 
     if (store.mouse.down && store.mouse.x >= 0) {
+      // 迷你豆壁薄升温快：熔化速度 ×1.2，更容易烫糊
+      const speed = IRON_SPEED * (store.beadSize === 'mini' ? 1.2 : 1)
       for (let r = 0; r < store.rows; r++) {
         for (let c = 0; c < store.cols; c++) {
           const cell = store.grid[r][c]
@@ -64,7 +67,7 @@ export function useIroning(render: () => void) {
           const d2 = ex * ex + ey * ey
           if (d2 < 1) {
             const f = 1 - Math.sqrt(d2)
-            cell.melt = Math.min(1, cell.melt + IRON_SPEED * f * dt)
+            cell.melt = Math.min(1, cell.melt + speed * f * dt)
           }
         }
       }

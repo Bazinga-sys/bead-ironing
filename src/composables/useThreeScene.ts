@@ -2,7 +2,15 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { store } from '../stores/game'
-import { BURN, FUSE_MAX, beadHash } from '../utils/color'
+import { FUSE_MAX, beadHash, burnAt } from '../utils/color'
+import {
+  BEAD_HEIGHT,
+  BEAD_SCALE,
+  createEvaFilledMaterial,
+  createEvaHollowMaterial,
+  createFilledBeadGeometry,
+  createHollowBeadGeometry,
+} from './useBeadGeometry'
 
 export interface ThreeHandle {
   resize(): void
@@ -86,47 +94,11 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
     const offX = -(store.cols - 1) * sp / 2
     const offZ = -(store.rows - 1) * sp / 2
 
-    // 空心珠：圆环拉伸（高细分，圆润边缘）
-    const ringShape = new THREE.Shape()
-    ringShape.absarc(0, 0, 1, 0, Math.PI * 2, false)
-    const hp = new THREE.Path()
-    hp.absarc(0, 0, 0.42, 0, Math.PI * 2, true)
-    ringShape.holes.push(hp)
-    const hollowGeo = new THREE.ExtrudeGeometry(ringShape, {
-      depth: 0.55,
-      bevelEnabled: true,
-      bevelThickness: 0.09,
-      bevelSize: 0.09,
-      bevelSegments: 4,
-      curveSegments: 32,
-    })
-    hollowGeo.center()
-    hollowGeo.rotateX(Math.PI / 2)
-
-    // 熔融扁珠：圆角矩形拉伸（带 bevel，边缘圆润如熔融塑料）
-    const rw = 0.95
-    const rh = 0.95
-    const rr = 0.25
-    const rrect = new THREE.Shape()
-    rrect.moveTo(-rw + rr, -rh)
-    rrect.lineTo(rw - rr, -rh)
-    rrect.quadraticCurveTo(rw, -rh, rw, -rh + rr)
-    rrect.lineTo(rw, rh - rr)
-    rrect.quadraticCurveTo(rw, rh, rw - rr, rh)
-    rrect.lineTo(-rw + rr, rh)
-    rrect.quadraticCurveTo(-rw, rh, -rw, rh - rr)
-    rrect.lineTo(-rw, -rh + rr)
-    rrect.quadraticCurveTo(-rw, -rh, -rw + rr, -rh)
-    const filledGeo = new THREE.ExtrudeGeometry(rrect, {
-      depth: 1,
-      bevelEnabled: true,
-      bevelThickness: 0.08,
-      bevelSize: 0.08,
-      bevelSegments: 4,
-      curveSegments: 32,
-    })
-    filledGeo.center()
-    filledGeo.rotateX(Math.PI / 2)
+    // 空心珠 / 熔融扁珠几何体与 EVA 哑光材质（与拼豆棋盘 useThreeBoard 共用，形态/质感一致）
+    const size = store.beadSize
+    const { s, tol } = BEAD_SCALE[size]
+    const hollowGeo = createHollowBeadGeometry(size)
+    const filledGeo = createFilledBeadGeometry(size)
 
     let hc = 0
     let fc = 0
@@ -146,13 +118,8 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
     const q = new THREE.Quaternion()
 
     if (hc > 0) {
-      // 未熔融空心珠：半透明塑料（清漆层高光 + 透射透光 + 环境反射）
-      const mat = new THREE.MeshPhysicalMaterial({
-        roughness: 0.3, metalness: 0,
-        clearcoat: 1, clearcoatRoughness: 0.12,
-        transmission: 0.6, ior: 1.5, thickness: 0.9,
-        envMapIntensity: 1.4,
-      })
+      // 未熨烫空心珠：EVA 哑光雾面（高粗糙度、无清漆，轻微雾面透光），色彩鲜艳
+      const mat = createEvaHollowMaterial()
       const mesh = new THREE.InstancedMesh(hollowGeo, mat, hc)
       mesh.castShadow = true
       mesh.name = 'beadMeshHollow'
@@ -162,8 +129,10 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
           const cell = store.grid[r][c]
           if (!cell.color || cell.melt >= 0.35) continue
           const m = cell.melt
-          const h = 1.0 * (1 - m * 0.92)
-          const rad = 0.48 + m * 0.18
+          // ±0.2mm 生产公差：每颗豆尺寸略有差异
+          const jitter = 1 + (beadHash(r, c) - 0.5) * 2 * tol
+          const h = s * jitter * BEAD_HEIGHT * (1 - m * 0.92)
+          const rad = s * jitter * (0.48 + m * 0.18)
           pos.set(offX + c * sp, h / 2, offZ + r * sp)
           sc.set(rad, h, rad)
           m4.compose(pos, q, sc)
@@ -179,13 +148,8 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
     }
 
     if (fc > 0) {
-      // 熔融扁珠：更光滑的半透明塑料片（熨烫后表面平顺，清漆层更亮）
-      const mat = new THREE.MeshPhysicalMaterial({
-        roughness: 0.22, metalness: 0,
-        clearcoat: 1, clearcoatRoughness: 0.1,
-        transmission: 0.45, ior: 1.5, thickness: 0.8,
-        envMapIntensity: 1.5,
-      })
+      // 熔融扁珠：熨烫后更哑光、几乎不透光（雾面感明显），中心残留孔洞
+      const mat = createEvaFilledMaterial()
       const mesh = new THREE.InstancedMesh(filledGeo, mat, fc)
       mesh.castShadow = true
       mesh.name = 'beadMeshFilled'
@@ -195,9 +159,11 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
           const cell = store.grid[r][c]
           if (!cell.color || cell.melt < 0.35) continue
           const m = cell.melt
-          const h = 1.0 * (1 - m * 0.92)
-          const rad = 0.48 + m * 0.18
+          // ±0.2mm 生产公差 + 熔融扁珠的确定性形变
           const bh2 = beadHash(r, c)
+          const jitter = 1 + (bh2 - 0.5) * 2 * tol
+          const h = s * jitter * BEAD_HEIGHT * (1 - m * 0.92)
+          const rad = s * jitter * (0.48 + m * 0.18)
           const ax = 0.94 + bh2 * 0.12
           const az = 0.94 + (1 - bh2) * 0.12
           pos.set(offX + c * sp, h / 2, offZ + r * sp)
@@ -205,7 +171,7 @@ export function createThreeScene(container: HTMLElement): ThreeHandle {
           m4.compose(pos, q, sc)
           mesh.setMatrixAt(idx, m4)
           col.set(cell.color)
-          if (m > BURN) col.multiplyScalar(0.35)
+          if (m > burnAt(size)) col.multiplyScalar(0.35)
           else if (m > FUSE_MAX) col.multiplyScalar(0.78)
           mesh.setColorAt(idx, col)
           idx++

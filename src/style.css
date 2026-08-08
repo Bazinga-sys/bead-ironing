@@ -148,30 +148,30 @@ body {
 .scroll-wrap {
   position: absolute;
   inset: 0;
-  overflow: hidden; /* 无限画布：平移/缩放由视口自绘，不使用原生滚动条 */
+  overflow: hidden; /* 无限画布：平移/缩放由三维棋盘自绘，不使用原生滚动条 */
 }
 
-.canvas-pixel {
+/* three.js 棋盘画布：全尺寸铺满视口，禁用触摸滚动手势（滚轮缩放由 useThreeBoard 接管） */
+.scroll-wrap canvas {
   display: block;
   width: 100%;
   height: 100%;
-  background: #ffffff;
-  cursor: crosshair;
+  touch-action: none;
 }
 
-.canvas-pixel.canvas-hidden {
+.scroll-wrap.canvas-hidden {
   display: none;
 }
 
-.canvas-pixel.iron-cursor {
+.scroll-wrap.iron-cursor canvas {
   cursor: none;
 }
 
-.canvas-pixel.pan-mode {
+.scroll-wrap.pan-mode canvas {
   cursor: grab;
 }
 
-.canvas-pixel.pan-mode.pan-dragging {
+.scroll-wrap.pan-mode.pan-dragging canvas {
   cursor: grabbing;
 }
 

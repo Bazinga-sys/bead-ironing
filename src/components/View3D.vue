@@ -35,6 +35,15 @@ watch(
   },
 )
 
+// 豆子规格切换（5mm / 2.6mm）→ 重建 3D 珠体
+watch(
+  () => store.beadSize,
+  () => {
+    if (!handle || store.mode !== 'view3d') return
+    handle.rebuild()
+  },
+)
+
 onUnmounted(() => handle?.dispose())
 </script>
 

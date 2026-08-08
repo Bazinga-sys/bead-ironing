@@ -1,17 +1,13 @@
 import { computed, reactive } from 'vue'
-import type { Cell, IronProgress, Mode, MouseState, SavedBoard, ViewState } from '../types'
-import { CELL, COLORS, DISPLAY_CELL } from '../utils/color'
+import type { BeadSize, Cell, IronProgress, Mode, MouseState, SavedBoard } from '../types'
+import { CELL, COLORS } from '../utils/color'
 import { rotForId } from '../utils/rotation'
 import { renderThumb } from '../utils/thumbnail'
 
 const STORAGE_KEY = 'bead-iron.savedBoards'
 
-/** 无限画布缩放范围与网格上限（上限防止极端缩放下内存/遍历失控） */
-export const MIN_ZOOM = 0.2
-export const MAX_ZOOM = 10
+/** 网格上限（防止极端缩放下内存/遍历失控） */
 export const MAX_GRID = 200
-/** 每格显示像素低于该值时隐藏网格线/定位点（缩小时画面干净且省性能） */
-export const MIN_GRID_LINE = 12
 
 /** 重新生成缩略图（当前 renderThumb 规则），用于旧数据迁移 */
 function regenerateThumb(grid: Cell[][]): string {
@@ -99,8 +95,8 @@ export const store = reactive({
   /** 网格内容版本号：任何珠子/图纸变更时 +1，供画布静态层缓存失效检测 */
   gridVersion: 0,
   mode: 'design' as Mode,
-  /** 无限画布视口：世界坐标左上角 + 显示倍率（滚轮以鼠标为锚缩放 / 拖拽平移） */
-  view: { x: 0, y: 0, zoom: 1 } as ViewState,
+  /** 豆子规格：大豆 5mm（新手/手摆）／迷你豆 2.6mm（像素精细、更易烫糊） */
+  beadSize: 'big' as BeadSize,
   mouse: { x: -1, y: -1, down: false } as MouseState,
   selectedColor: COLORS[0],
   isEraser: false,
@@ -164,12 +160,13 @@ export function expandGridKeep(minCols: number, minRows: number) {
   store.gridVersion++ // 网格线数量变化，静态层缓存失效
 }
 
-/** 窗口/容器尺寸变化 → 按当前缩放把网格扩容到覆盖视口（内容坐标不变，只追加空行/列） */
+/**
+ * 窗口/容器尺寸变化 → 把网格扩容到覆盖视口（内容坐标不变，只追加空行/列）。
+ * 视口状态由 useThreeBoard 维护（scale=1 时每格 DISPLAY_CELL 显示像素），
+ * 这里按默认缩放的可见格数估算，棋盘渲染器随后会按实际可见范围再次扩容。
+ */
 export function setupGrid(w: number, h: number) {
-  expandGridKeep(
-    Math.ceil(w / (DISPLAY_CELL * store.view.zoom)),
-    Math.ceil(h / (DISPLAY_CELL * store.view.zoom)),
-  )
+  expandGridKeep(Math.ceil(w / 36), Math.ceil(h / 36))
 }
 
 /** 图片导入时按需扩容画布（调用方随后会覆盖全部格子） */
@@ -246,6 +243,18 @@ export function switchMode(m: Mode) {
 export function selectColor(hex: string) {
   store.selectedColor = hex
   store.isEraser = false
+}
+
+/** 切换豆子规格（5mm / 2.6mm）：几何体与珠体尺寸变化 → gridVersion++ 触发棋盘重建 */
+export function setBeadSize(size: BeadSize) {
+  if (store.beadSize === size) return
+  store.beadSize = size
+  store.gridVersion++
+  showStatus(
+    size === 'big'
+      ? '大豆 5mm：新手友好，可手拿摆放'
+      : '迷你豆 2.6mm：像素精细，熨烫更容易糊边',
+  )
 }
 
 export function toggleEraser() {

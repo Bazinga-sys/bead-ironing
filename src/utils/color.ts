@@ -1,3 +1,5 @@
+import type { BeadSize } from '../types'
+
 /** 布局与物理常量（与原 HTML 一致） */
 export const CELL = 14
 export const DISPLAY_CELL = 36
@@ -8,6 +10,11 @@ export const FUSE_MAX = 0.7
 export const BURN = 0.85
 export const IRON_SPEED = 1.0
 export const MAX_PIX = 60
+
+/** 豆子烫糊阈值：迷你豆壁薄更易糊边（比 5mm 早 0.05 烫糊） */
+export function burnAt(size: BeadSize): number {
+  return size === 'mini' ? BURN - 0.05 : BURN
+}
 
 /** 调色板（原应用完整颜色表） */
 export const COLORS = [

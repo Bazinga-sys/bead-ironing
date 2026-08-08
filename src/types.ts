@@ -10,17 +10,13 @@ export interface Cell {
 
 export type Mode = 'design' | 'ironing' | 'view3d'
 
+/** 豆子规格：大豆 5mm（外径 5、孔径 ~2.5）／迷你豆 2.6mm（外径 2.6、孔径 ~1.5） */
+export type BeadSize = 'big' | 'mini'
+
 export interface MouseState {
   x: number
   y: number
   down: boolean
-}
-
-/** 无限画布视口：左上角世界坐标（逻辑像素）+ 显示倍率（1 = 每格 DISPLAY_CELL 显示像素） */
-export interface ViewState {
-  x: number
-  y: number
-  zoom: number
 }
 
 export interface IronProgress {
