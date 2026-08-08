@@ -37,7 +37,10 @@ watch(
 )
 
 onMounted(() => {
-  if (wrap.value) board = createThreeBoard(wrap.value)
+  if (wrap.value) {
+    board = createThreeBoard(wrap.value)
+    board.rebuild() // 初始渲染：autosave 恢复的作品不依赖 resize 扩容也能立即显示
+  }
 })
 
 onUnmounted(() => {

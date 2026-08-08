@@ -7,8 +7,8 @@ import { CELL, DISPLAY_CELL, FUSE_MAX, IRON_RADIUS, beadHash, burnAt } from '../
 import {
   BEAD_HEIGHT,
   BEAD_SCALE,
-  createEvaFilledMaterial,
-  createEvaHollowMaterial,
+  createEvaFilledMaterials,
+  createEvaHollowMaterials,
   createFilledBeadGeometry,
   createHollowBeadGeometry,
 } from './useBeadGeometry'
@@ -50,8 +50,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 600)
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-  renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.1
+  // Neutral tone mapping：相比 ACES 不压缩高饱和色，拼豆颜色更浓郁
+  renderer.toneMapping = THREE.NeutralToneMapping
+  renderer.toneMappingExposure = 1.15
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   container.appendChild(renderer.domElement)
@@ -64,11 +65,12 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   controls.enableDamping = true
   controls.dampingFactor = 0.08
 
-  // 光照：房间环境贴图（塑料高光的来源）+ 环境光 + 主光（投射阴影）
+  // 光照：房间环境贴图（塑料高光的来源）+ 低环境光 + 主光（阴影）+ 补光（暗面细节）
+  // 低环境光 + 高主光 → 明暗对比强、体积感明显；补光避免暗面死黑
   const pmrem = new THREE.PMREMGenerator(renderer)
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6))
-  const key = new THREE.DirectionalLight(0xffffff, 1.6)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  const key = new THREE.DirectionalLight(0xffffff, 2.6)
   scene.add(key)
   scene.add(key.target) // 阴影相机跟随注视中心，无限画布平移后阴影不丢
   key.castShadow = true
@@ -82,6 +84,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   key.shadow.camera.far = 300
   key.shadow.camera.updateProjectionMatrix()
   key.shadow.bias = -0.002
+  const fill = new THREE.DirectionalLight(0xffffff, 0.5)
+  scene.add(fill)
+  fill.target = new THREE.Object3D()
+  scene.add(fill.target) // 补光方向固定跟随注视中心，平移画布时光照一致
 
   // 工作台地面（白色，接收珠子的投影）
   const ground = new THREE.Mesh(
@@ -105,11 +111,11 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   gridLines.position.y = 0.005
   scene.add(gridLines)
 
-  // 珠子几何体与 EVA 哑光材质（雾面无高光、轻微透光）
+  // 珠子几何体与 EVA 材质组（[0]=cap 顶/底面、[1]=侧面，配合 ExtrudeGeometry groups）
   let hollowGeo = createHollowBeadGeometry(store.beadSize)
   let filledGeo = createFilledBeadGeometry(store.beadSize)
-  const hollowMat = createEvaHollowMaterial()
-  const filledMat = createEvaFilledMaterial()
+  const hollowMats = createEvaHollowMaterials()
+  const filledMats = createEvaFilledMaterials()
   let size: BeadSize = store.beadSize
   let hollowMesh: THREE.InstancedMesh | null = null
   let filledMesh: THREE.InstancedMesh | null = null
@@ -217,6 +223,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     // 主光跟随注视中心，保持一致的阴影方向与覆盖范围
     key.position.set(center.x + 60, 120, center.z + 40)
     key.target.position.set(center.x, 0, center.z)
+    // 补光从斜对面照向注视中心，填充暗面
+    fill.position.set(center.x - 70, 70, center.z - 50)
+    fill.target.position.set(center.x, 0, center.z)
     updateGridLines()
   }
 
@@ -268,7 +277,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     beadIndex.clear()
 
     if (hollow.length > 0) {
-      hollowMesh = new THREE.InstancedMesh(hollowGeo, hollowMat, Math.max(hollow.length, 1))
+      hollowMesh = new THREE.InstancedMesh(hollowGeo, hollowMats, Math.max(hollow.length, 1))
       hollowMesh.castShadow = true
       for (let i = 0; i < hollow.length; i++) {
         const { r, c, m } = hollow[i]
@@ -281,7 +290,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       scene.add(hollowMesh)
     }
     if (filled.length > 0) {
-      filledMesh = new THREE.InstancedMesh(filledGeo, filledMat, Math.max(filled.length, 1))
+      filledMesh = new THREE.InstancedMesh(filledGeo, filledMats, Math.max(filled.length, 1))
       filledMesh.castShadow = true
       for (let i = 0; i < filled.length; i++) {
         const { r, c, m } = filled[i]
@@ -543,8 +552,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     filledGeo.dispose()
     lineGeo.dispose()
     patternGeo.dispose()
-    hollowMat.dispose()
-    filledMat.dispose()
+    for (const m of hollowMats) m.dispose()
+    for (const m of filledMats) m.dispose()
     const el = renderer.domElement
     el.removeEventListener('pointerdown', onPointerDown)
     window.removeEventListener('pointermove', onPointerMove)

@@ -133,37 +133,56 @@ function createRoughnessMap(opts: { center: number; spread: number; glossySpots?
 }
 
 /**
- * EVA 空心珠材质（未熨烫原生 EVA，哑光软塑料）：
- * 金属度 0 / 粗糙度 0.70±0.05 / IOR 1.46 / 极微弱半透（transmission 0.08）。
- * 高光模糊、范围大，几乎看不清清晰反射；与亮面 PE（roughness 0.4–0.5）明显区分。
+ * 豆子顶/底面（cap）材质：哑光、颜色高饱和。
+ * 俯视视角下豆子顶部是第一印象——顶层反光刻意压到最弱（clearcoat 0.08、envMap 0.8），
+ * 让颜色鲜艳不冲淡，避免"整片发白"。
  */
-export function createEvaHollowMaterial(): THREE.MeshPhysicalMaterial {
+function createEvaCapMaterial(opts: { glossySpots: boolean }): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
     roughness: 1, // 乘法工作流：实际值由 roughnessMap 承载
-    roughnessMap: createRoughnessMap({ center: 0.7, spread: 0.05 }),
+    roughnessMap: createRoughnessMap(
+      opts.glossySpots
+        ? { center: 0.5, spread: 0.03, glossySpots: true }
+        : { center: 0.55, spread: 0.04 },
+    ),
     metalness: 0,
-    clearcoat: 0,
-    transmission: 0.08,
+    clearcoat: 0.08,
+    clearcoatRoughness: 0.4,
+    transmission: 0.02,
     ior: 1.46,
-    thickness: 1.2,
-    envMapIntensity: 1.0,
+    thickness: 1.0,
+    envMapIntensity: 0.6,
+    specularIntensity: 0.7,
   })
 }
 
 /**
- * EVA 熔融扁珠材质（熨烫完成后的成品）：
- * 大部分区域保持 0.62–0.68 哑光，局部熔接处轻微变光滑发亮（0.45–0.55）；
- * 比未熨烫更不透光，仍无金属感。
+ * 豆子侧壁材质：光滑清漆反光（clearcoat 0.8、近乎镜面）。
+ * 圆柱曲面受光形成垂直亮带——侧面的塑料反光感来自这里。
  */
-export function createEvaFilledMaterial(): THREE.MeshPhysicalMaterial {
+function createEvaSideMaterial(opts: { glossy: boolean }): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
-    roughness: 1, // 乘法工作流：实际值由 roughnessMap 承载
-    roughnessMap: createRoughnessMap({ center: 0.65, spread: 0.03, glossySpots: true }),
+    roughness: opts.glossy ? 0.25 : 0.3,
     metalness: 0,
-    clearcoat: 0,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.12,
     transmission: 0.03,
     ior: 1.46,
-    thickness: 1.5,
-    envMapIntensity: 0.95,
+    thickness: 1.2,
+    envMapIntensity: 3.0,
+    specularIntensity: 2.0,
   })
+}
+
+/**
+ * 空心珠材质组：[0]=cap 顶/底面（哑光高饱和）、[1]=侧面（清漆反光）。
+ * ExtrudeGeometry 的 material groups 与之对应（group 0 = 上下 cap，group 1 = 侧壁）。
+ */
+export function createEvaHollowMaterials(): THREE.Material[] {
+  return [createEvaCapMaterial({ glossySpots: false }), createEvaSideMaterial({ glossy: false })]
+}
+
+/** 熔融扁珠材质组：顶面带熔接亮斑，侧面比原生豆更光滑 */
+export function createEvaFilledMaterials(): THREE.Material[] {
+  return [createEvaCapMaterial({ glossySpots: true }), createEvaSideMaterial({ glossy: true })]
 }
