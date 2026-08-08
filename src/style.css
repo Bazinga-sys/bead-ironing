@@ -1,0 +1,539 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: #f5f3ee;
+  color: #3a3d42;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- 侧栏 ---------- */
+.sidebar {
+  width: 88px;
+  background: #ffffff;
+  border-right: 1px solid #e5e1d8;
+  box-shadow: 2px 0 8px rgba(60, 55, 45, 0.06);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.sidebar-tools {
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid #eeeae1;
+}
+
+.mode-btn {
+  padding: 7px 6px;
+  border: 1px solid #ddd8cd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4a4d52;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  line-height: 1.3;
+  box-shadow: 0 1px 2px rgba(60, 55, 45, 0.08);
+  transition: background 0.12s, box-shadow 0.12s, transform 0.06s;
+}
+
+.mode-btn:hover:not(:disabled) {
+  background: #f2f5fa;
+  box-shadow: 0 2px 4px rgba(60, 55, 45, 0.12);
+}
+
+.mode-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.mode-btn.active {
+  background: #4a90d9;
+  border-color: #3a7dc4;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(74, 144, 217, 0.35);
+}
+
+.mode-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-import {
+  background: #eaf6ee;
+  border-color: #bfe3ca;
+  color: #2e7d4f;
+}
+
+.btn-import:hover:not(:disabled) {
+  background: #d7efdf;
+}
+
+.btn-import.active {
+  background: #34a853;
+  border-color: #2c9148;
+}
+
+.btn-save {
+  background: #fdf4e3;
+  border-color: #eed9a8;
+  color: #9a6b1c;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #fbedcf;
+}
+
+.btn-save.active {
+  background: #e6a23c;
+  border-color: #d18f2b;
+}
+
+.btn-panel {
+  background: #eaf5f6;
+  border-color: #c3e4e8;
+  color: #1f7a84;
+}
+
+.btn-panel:hover:not(:disabled) {
+  background: #d9eef1;
+}
+
+.btn-panel.active {
+  background: #2a8a8a;
+  border-color: #247575;
+}
+
+.btn-clear {
+  background: #fbecec;
+  border-color: #efc6c6;
+  color: #b3372f;
+}
+
+.btn-clear:hover:not(:disabled) {
+  background: #f8dcdc;
+}
+
+.btn-clear.active {
+  background: #d9534f;
+  border-color: #c44541;
+}
+
+.file-input {
+  display: none;
+}
+
+/* ---------- 调色板 ---------- */
+.palette-bar {
+  padding: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  align-content: flex-start;
+  overflow-y: auto;
+}
+
+.palette-bar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.palette-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.palette-bar::-webkit-scrollbar-thumb {
+  background: #d9d5cc;
+  border-radius: 3px;
+}
+
+.color-swatch {
+  width: 100%;
+  height: 22px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: transform 0.1s;
+}
+
+.color-swatch:hover {
+  transform: scale(1.12);
+}
+
+.color-swatch.selected {
+  border: 2px solid #3a3d42;
+  transform: scale(1.12);
+  box-shadow: 0 2px 6px rgba(60, 55, 45, 0.25);
+}
+
+.eraser-btn {
+  width: 100%;
+  height: 22px;
+  background: #ffffff;
+  color: #6b6f76;
+  border: 1px solid #ddd8cd;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.eraser-btn.selected {
+  border: 2px solid #3a3d42;
+  color: #b3372f;
+}
+
+/* ---------- 舞台 ---------- */
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  background: #f5f3ee;
+}
+
+.scroll-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  display: flex;
+}
+
+.scroll-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scroll-wrap::-webkit-scrollbar-track {
+  background: #f5f3ee;
+}
+
+.scroll-wrap::-webkit-scrollbar-thumb {
+  background: #d9d5cc;
+  border-radius: 5px;
+}
+
+.canvas-pixel {
+  display: block;
+  background: #ffffff;
+  margin: auto;
+  cursor: crosshair;
+}
+
+.canvas-pixel.canvas-hidden {
+  display: none;
+}
+
+.canvas-pixel.iron-cursor {
+  cursor: none;
+}
+
+.canvas-pixel.pan-mode {
+  cursor: grab;
+}
+
+.canvas-pixel.pan-mode.pan-dragging {
+  cursor: grabbing;
+}
+
+.three-container {
+  position: absolute;
+  inset: 0;
+  display: none;
+  z-index: 5;
+}
+
+.three-container.show {
+  display: block;
+}
+
+/* ---------- 状态提示 ---------- */
+.status-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  border: 1px solid #e5e1d8;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(60, 55, 45, 0.12);
+  padding: 8px 18px;
+  font-size: 13px;
+  color: #3a3d42;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.status-bar.show {
+  opacity: 1;
+}
+
+/* ---------- 熨烫进度 ---------- */
+.iron-progress {
+  display: none;
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid #e5e1d8;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(60, 55, 45, 0.12);
+  padding: 10px 12px;
+  z-index: 50;
+}
+
+.iron-progress.show {
+  display: block;
+}
+
+.progress-label {
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 6px;
+  color: #6b6f76;
+}
+
+.progress-bar {
+  height: 14px;
+  background: #f0ede5;
+  border: 1px solid #e5e1d8;
+  border-radius: 7px;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #4a90d9;
+  border-radius: 7px;
+  transition: width 0.1s;
+}
+
+.progress-zone {
+  position: absolute;
+  top: 0;
+  left: 30%;
+  width: 40%;
+  height: 100%;
+  border-left: 1px dashed #34a853;
+  border-right: 1px dashed #34a853;
+  pointer-events: none;
+}
+
+/* ---------- 作品墙（冰箱贴） ---------- */
+.board-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: none;
+  overflow: hidden;
+  /* 浅色墙面，突出彩色塑料冰箱贴 */
+  background-color: #f0ede5;
+  background-image: linear-gradient(#f4f1e9 1px, transparent 1px);
+  background-size: 100% 3px;
+}
+
+.board-panel.show {
+  display: block;
+}
+
+.board-panel-head {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 20;
+}
+
+.board-panel-title {
+  font-size: 15px;
+  color: #4a4d52;
+  letter-spacing: 2px;
+}
+
+.board-panel-close {
+  width: 30px;
+  height: 30px;
+  background: #ffffff;
+  border: 1px solid #ddd8cd;
+  border-radius: 8px;
+  color: #6b6f76;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(60, 55, 45, 0.12);
+}
+
+.board-panel-close:hover {
+  background: #fbecec;
+  color: #b3372f;
+}
+
+.board-panel-empty {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #99968d;
+  font-size: 13px;
+  line-height: 2;
+  pointer-events: none;
+}
+
+/* ---------- 冰箱贴 ---------- */
+.fridge-magnet {
+  position: absolute;
+  padding: 8px 8px 6px;
+  background: #ffffff;
+  border: 1px solid #e0dcd2;
+  border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(60, 55, 45, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 悬停才出现描边，提示可以拿起/操作 */
+.fridge-magnet:hover {
+  border-color: #4a90d9;
+  box-shadow: 0 6px 16px rgba(74, 144, 217, 0.28);
+}
+
+.fridge-magnet.dragging {
+  z-index: 50;
+  cursor: grabbing;
+  border-color: #e6a23c;
+  box-shadow: 0 8px 20px rgba(60, 55, 45, 0.28);
+}
+
+.magnet-thumb {
+  display: block;
+  background: transparent;
+  pointer-events: none;
+}
+
+.magnet-del {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 24px;
+  height: 24px;
+  background: #ffffff;
+  border: 1px solid #ddd8cd;
+  border-radius: 50%;
+  color: #b3372f;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(60, 55, 45, 0.2);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.fridge-magnet:hover .magnet-del {
+  opacity: 1;
+}
+
+.magnet-del:hover {
+  background: #fbecec;
+}
+
+/* 旋转/缩放操作柄：悬停磁贴时出现的圆形小按钮 */
+.magnet-rot,
+.magnet-scale {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: #ffffff;
+  border: 1px solid #ddd8cd;
+  border-radius: 50%;
+  color: #4a4d52;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: grab;
+  box-shadow: 0 2px 6px rgba(60, 55, 45, 0.2);
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 5;
+}
+
+.fridge-magnet:hover .magnet-rot,
+.fridge-magnet:hover .magnet-scale {
+  opacity: 1;
+}
+
+.magnet-rot {
+  top: -12px;
+  left: 50%;
+  margin-left: -12px;
+}
+
+.magnet-scale {
+  bottom: -12px;
+  right: -12px;
+  cursor: nwse-resize;
+}
+
+.magnet-rot:hover,
+.magnet-scale:hover {
+  background: #f2f5fa;
+  border-color: #4a90d9;
+}
