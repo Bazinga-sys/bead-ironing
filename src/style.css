@@ -11,7 +11,8 @@ body,
 }
 
 body {
-  background: #f5f3ee;
+  /* 页面背景透明：侧栏/工具栏/调色盘为透明面板，不再有米色矩形和边框线 */
+  background: transparent;
   color: #3a3d42;
   font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   overflow: hidden;
@@ -34,6 +35,9 @@ body {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  /* 舞台绝对铺满整个窗口，侧栏（透明）悬浮在棋盘之上 */
+  position: relative;
+  justify-content: space-between;
 }
 
 /* ---------- 侧栏 ---------- */
@@ -43,20 +47,19 @@ body {
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  /* 浮在舞台（全窗口棋盘）之上 */
+  position: relative;
+  z-index: 1;
 }
 
-/* 左侧：工具按钮菜单（vue-bits LineSidebar） */
+/* 左侧：工具按钮菜单（vue-bits LineSidebar）——无边框无底色，内容直接浮在页面背景上 */
 .sidebar-left {
   width: 192px;
-  border-right: 1px solid #e5e1d8;
-  box-shadow: 2px 0 8px rgba(60, 55, 45, 0.06);
 }
 
-/* 右侧：颜色轮（vue-bits OptionWheel） */
+/* 右侧：颜色轮（vue-bits OptionWheel）——无边框无底色 */
 .sidebar-right {
   width: 236px;
-  border-left: 1px solid #e5e1d8;
-  box-shadow: -2px 0 8px rgba(60, 55, 45, 0.06);
 }
 
 .sidebar-tools {
@@ -102,13 +105,16 @@ body {
 }
 
 /* ---------- 舞台 ---------- */
+/* 3D 棋盘铺满整个窗口（侧栏透明，悬浮于棋盘之上）。
+   z-index 保持 auto：不建立层叠上下文，SavePanel(z-8)/IronProgress(z-50) 等覆盖层
+   仍能盖过侧栏（z-1）。 */
 .canvas-wrap {
-  flex: 1;
-  position: relative;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   min-height: 0;
   min-width: 0;
-  background: #f5f3ee;
+  background: transparent;
 }
 
 .scroll-wrap {

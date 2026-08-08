@@ -45,10 +45,12 @@ const PITCH_MAX = (85 * Math.PI) / 180
  */
 export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0xf5f3ee)
+  // 背景白色：棋盘地面/背景一体（侧栏透明悬浮其上）。不用纯透明——
+  // 有些浏览器的默认页面底色为黑，透明处会露出黑块
+  scene.background = new THREE.Color(0xffffff)
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 600)
-  const renderer = new THREE.WebGLRenderer({ antialias: true })
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   // Neutral tone mapping：相比 ACES 不压缩高饱和色，拼豆颜色更浓郁
   renderer.toneMapping = THREE.NeutralToneMapping
@@ -90,9 +92,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   fill.target = new THREE.Object3D()
   scene.add(fill.target) // 补光方向固定跟随注视中心，平移画布时光照一致
 
-  // 工作台地面（白色，接收珠子的投影）
+  // 工作台地面（白色，接收珠子的投影）；范围足够大，任何缩放下都盖住视口
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(600, 600),
+    new THREE.PlaneGeometry(3000, 3000),
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 }),
   )
   ground.rotation.x = -Math.PI / 2
