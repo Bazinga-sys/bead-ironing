@@ -163,15 +163,11 @@ body {
   cursor: none;
 }
 
-.scroll-wrap.pan-mode canvas {
-  cursor: grab;
-}
-
 .scroll-wrap.view-mode canvas {
   cursor: grab;
 }
 
-.scroll-wrap.pan-mode.pan-dragging canvas {
+.scroll-wrap.view-mode.view-dragging canvas {
   cursor: grabbing;
 }
 

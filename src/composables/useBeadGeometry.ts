@@ -16,6 +16,40 @@ export const BEAD_SCALE: Record<BeadSize, { s: number; hole: number; tol: number
 export const BEAD_HEIGHT = 2.0
 
 /**
+ * 把 ExtrudeGeometry 的侧壁组（materialIndex 1）按顶点半径拆成两段：
+ * group 1 = 外壁（清漆反光带）、group 2 = 孔内壁（哑光，俯视时孔洞不发亮）。
+ * ExtrudeGeometry 侧壁顶点顺序固定——先外轮廓、后孔轮廓——且顶点半径要么≈外径
+ * 要么≈孔径，半径分类天然连续，正好分成两个 run。
+ */
+function splitSideWallGroups(geo: THREE.BufferGeometry, threshold: number): void {
+  const pos = geo.attributes.position as THREE.BufferAttribute
+  const side = geo.groups.find((g) => g.materialIndex === 1)
+  if (!side) return
+  const isOuter = (v0: number): boolean => {
+    for (let k = 0; k < 3; k++) {
+      const i = v0 + k
+      if (pos.getX(i) * pos.getX(i) + pos.getZ(i) * pos.getZ(i) < threshold * threshold) return false
+    }
+    return true
+  }
+  const groups: { start: number; count: number; materialIndex: number }[] = []
+  for (const g of geo.groups) if (g.materialIndex === 0) groups.push({ start: g.start, count: g.count, materialIndex: 0 })
+  let runStart = side.start
+  let runMat = isOuter(side.start) ? 1 : 2
+  for (let i = side.start + 3; i < side.start + side.count; i += 3) {
+    const m = isOuter(i) ? 1 : 2
+    if (m !== runMat) {
+      groups.push({ start: runStart, count: i - runStart, materialIndex: runMat })
+      runStart = i
+      runMat = m
+    }
+  }
+  groups.push({ start: runStart, count: side.start + side.count - runStart, materialIndex: runMat })
+  geo.clearGroups()
+  for (const g of groups) geo.addGroup(g.start, g.count, g.materialIndex)
+}
+
+/**
  * 空心珠几何体（EVA 空心短圆筒）：圆环拉伸（高细分、圆润边缘），俯视可见贯穿珠孔。
  * 孔径占比随豆子规格变化。拼豆棋盘（useThreeBoard）专用，
  */
@@ -33,6 +67,8 @@ export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeG
   })
   geo.center()
   geo.rotateX(Math.PI / 2)
+  // 侧壁拆成外壁/内壁两组材质（外壁清漆反光、内壁哑光）
+  splitSideWallGroups(geo, (1 + BEAD_SCALE[size].hole) / 2)
   return geo
 }
 
@@ -66,6 +102,8 @@ export function createFilledBeadGeometry(_size: BeadSize = 'big'): THREE.Extrude
   })
   geo.center()
   geo.rotateX(Math.PI / 2)
+  // 侧壁拆成外壁/内壁两组材质（圆角矩形的角顶点半径可达 ~1.24，孔半径 0.22，阈值取 0.45）
+  splitSideWallGroups(geo, 0.45)
   return geo
 }
 
@@ -134,55 +172,82 @@ function createRoughnessMap(opts: { center: number; spread: number; glossySpots?
 
 /**
  * 豆子顶/底面（cap）材质：哑光、颜色高饱和。
- * 俯视视角下豆子顶部是第一印象——顶层反光刻意压到最弱（clearcoat 0.08、envMap 0.8），
- * 让颜色鲜艳不冲淡，避免"整片发白"。
+ * 俯视视角下豆子顶部是第一印象——顶层按 EVA 规范做哑光（hollow 0.70±0.04、
+ * filled 0.62±0.04 + 局部熔接亮斑），且几乎不吃环境高光（env 0.12、无清漆层）：
+ * Neutral 色调映射在 peak>0.76 时会压缩并去饱和，顶部混入白色高光会把颜色冲淡。
  */
 function createEvaCapMaterial(opts: { glossySpots: boolean }): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
     roughness: 1, // 乘法工作流：实际值由 roughnessMap 承载
     roughnessMap: createRoughnessMap(
       opts.glossySpots
-        ? { center: 0.5, spread: 0.03, glossySpots: true }
-        : { center: 0.55, spread: 0.04 },
+        ? { center: 0.62, spread: 0.04, glossySpots: true }
+        : { center: 0.7, spread: 0.04 },
     ),
     metalness: 0,
-    clearcoat: 0.08,
-    clearcoatRoughness: 0.4,
+    clearcoat: 0,
     transmission: 0.02,
     ior: 1.46,
     thickness: 1.0,
-    envMapIntensity: 0.6,
-    specularIntensity: 0.7,
+    envMapIntensity: 0.12,
+    specularIntensity: 0.2,
   })
 }
 
 /**
- * 豆子侧壁材质：光滑清漆反光（clearcoat 0.8、近乎镜面）。
+ * 豆子外壁材质：清漆反光（clearcoat 0.7、微光）。
  * 圆柱曲面受光形成垂直亮带——侧面的塑料反光感来自这里。
+ * 强度刻意不拉满：俯视时外壁边缘是窄环，env 太强会变成每颗豆一圈白色眩光（"很强的反光"）；
+ * 调到 ~200-215 亮度仍有清晰塑料感，但俯视不刺眼。
  */
 function createEvaSideMaterial(opts: { glossy: boolean }): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
     roughness: opts.glossy ? 0.25 : 0.3,
     metalness: 0,
-    clearcoat: 0.8,
-    clearcoatRoughness: 0.12,
+    clearcoat: 0.7,
+    clearcoatRoughness: 0.14,
     transmission: 0.03,
     ior: 1.46,
     thickness: 1.2,
-    envMapIntensity: 3.0,
-    specularIntensity: 2.0,
+    envMapIntensity: 2.2,
+    specularIntensity: 1.5,
   })
 }
 
 /**
- * 空心珠材质组：[0]=cap 顶/底面（哑光高饱和）、[1]=侧面（清漆反光）。
- * ExtrudeGeometry 的 material groups 与之对应（group 0 = 上下 cap，group 1 = 侧壁）。
+ * 豆子孔内壁材质：哑光、整体压暗（假 AO 模拟孔洞内部阴影）。
+ * 俯视透过珠孔看到的应是暗色腔体而不是反光——内壁不再用外壁的清漆材质。
+ * 颜色系数乘 instanceColor 一起参与漫反射，孔内壁呈现"变暗的豆色"。
+ */
+function createEvaInnerMaterial(): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
+    color: 0x6f6f6f,
+    roughness: 0.9,
+    metalness: 0,
+    clearcoat: 0,
+    transmission: 0,
+    envMapIntensity: 0.15,
+    specularIntensity: 0.2,
+  })
+}
+
+/**
+ * 空心珠材质组：[0]=cap 顶/底面（哑光高饱和）、[1]=外壁（清漆反光）、[2]=孔内壁（哑光）。
+ * ExtrudeGeometry 的 material groups 与之对应（group 0 = 上下 cap，group 1/2 = 外/内壁）。
  */
 export function createEvaHollowMaterials(): THREE.Material[] {
-  return [createEvaCapMaterial({ glossySpots: false }), createEvaSideMaterial({ glossy: false })]
+  return [
+    createEvaCapMaterial({ glossySpots: false }),
+    createEvaSideMaterial({ glossy: false }),
+    createEvaInnerMaterial(),
+  ]
 }
 
 /** 熔融扁珠材质组：顶面带熔接亮斑，侧面比原生豆更光滑 */
 export function createEvaFilledMaterials(): THREE.Material[] {
-  return [createEvaCapMaterial({ glossySpots: true }), createEvaSideMaterial({ glossy: true })]
+  return [
+    createEvaCapMaterial({ glossySpots: true }),
+    createEvaSideMaterial({ glossy: true }),
+    createEvaInnerMaterial(),
+  ]
 }

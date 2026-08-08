@@ -56,9 +56,8 @@ onUnmounted(() => {
     class="scroll-wrap"
     :class="{
       'iron-cursor': store.mode === 'ironing',
-      'pan-mode': store.mode === 'design' && store.panMode,
-      'pan-dragging': store.mode === 'design' && store.panMode && store.mouse.down,
       'view-mode': store.mode === 'design' && store.viewMode,
+      'view-dragging': store.mode === 'design' && store.viewMode && store.mouse.down,
     }"
   />
 </template>

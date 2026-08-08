@@ -101,9 +101,7 @@ export const store = reactive({
   mouse: { x: -1, y: -1, down: false } as MouseState,
   selectedColor: COLORS[0],
   isEraser: false,
-  /** 拖拽工具：开启后左键拖动画布平移（设计模式），关闭时照常放豆 */
-  panMode: false,
-  /** 完成（展示）模式：隐藏棋盘线，左键拖拽旋转查看成品；关闭时恢复放豆 */
+  /** 视角工具：隐藏棋盘线，左键拖拽旋转视角、WASD 移动视角；关闭时恢复放豆（相机视角保持不变） */
   viewMode: false,
   status: '',
   statusVisible: false,
@@ -221,13 +219,15 @@ export function clearAll() {
 
 export function switchMode(m: Mode) {
   store.mode = m
-  // 拖拽/视角工具只在设计模式使用，切走时关闭
-  if (m !== 'design') {
-    store.panMode = false
-    store.viewMode = false
-  }
-  // 切回设计模式：全部珠子恢复未熔融
+  // 视角工具只在设计模式使用，切走时关闭
+  if (m !== 'design') store.viewMode = false
+  // 切回设计模式：全部珠子恢复未熔融；若在视角调整中，点「设计」退出视角工具（相机视角保留，可继续放豆）
+  let msg = '点击/拖拽放置拼豆'
   if (m === 'design') {
+    if (store.viewMode) {
+      store.viewMode = false
+      msg = '回到设计：视角已保留，可继续放豆'
+    }
     let touched = false
     for (const row of store.grid)
       for (const cell of row)
@@ -236,8 +236,10 @@ export function switchMode(m: Mode) {
           touched = true
         }
     if (touched) store.gridVersion++
+  } else {
+    msg = '按住拖动来熨烫'
   }
-  showStatus(m === 'design' ? '点击/拖拽放置拼豆' : '按住拖动来熨烫')
+  showStatus(msg)
 }
 
 export function selectColor(hex: string) {

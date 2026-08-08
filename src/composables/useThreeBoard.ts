@@ -52,7 +52,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   // Neutral tone mapping：相比 ACES 不压缩高饱和色，拼豆颜色更浓郁
   renderer.toneMapping = THREE.NeutralToneMapping
-  renderer.toneMappingExposure = 1.15
+  renderer.toneMappingExposure = 1.0
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   container.appendChild(renderer.domElement)
@@ -65,12 +65,13 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   controls.enableDamping = true
   controls.dampingFactor = 0.08
 
-  // 光照：房间环境贴图（塑料高光的来源）+ 低环境光 + 主光（阴影）+ 补光（暗面细节）
-  // 低环境光 + 高主光 → 明暗对比强、体积感明显；补光避免暗面死黑
+  // 光照：房间环境贴图（侧面高光的来源）+ 低环境光 + 主光（阴影）+ 补光（暗面细节）。
+  // 直射光只影响漫反射：顶部漫反射峰值必须 < 0.76（Neutral 色调映射的压缩起点），
+  // 否则红色通道被压缩/去饱和，颜色发白。侧面的清漆高光由 envMap 独立提供，不受影响。
   const pmrem = new THREE.PMREMGenerator(renderer)
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-  scene.add(new THREE.AmbientLight(0xffffff, 0.35))
-  const key = new THREE.DirectionalLight(0xffffff, 2.6)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.18))
+  const key = new THREE.DirectionalLight(0xffffff, 1.05)
   scene.add(key)
   scene.add(key.target) // 阴影相机跟随注视中心，无限画布平移后阴影不丢
   key.castShadow = true
@@ -84,7 +85,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   key.shadow.camera.far = 300
   key.shadow.camera.updateProjectionMatrix()
   key.shadow.bias = -0.002
-  const fill = new THREE.DirectionalLight(0xffffff, 0.5)
+  const fill = new THREE.DirectionalLight(0xffffff, 0.15)
   scene.add(fill)
   fill.target = new THREE.Object3D()
   scene.add(fill.target) // 补光方向固定跟随注视中心，平移画布时光照一致
@@ -111,7 +112,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   gridLines.position.y = 0.005
   scene.add(gridLines)
 
-  // 珠子几何体与 EVA 材质组（[0]=cap 顶/底面、[1]=侧面，配合 ExtrudeGeometry groups）
+  // 珠子几何体与 EVA 材质组（[0]=cap 顶/底面、[1]=外壁清漆、[2]=孔内壁哑光，配合 ExtrudeGeometry groups）
   let hollowGeo = createHollowBeadGeometry(store.beadSize)
   let filledGeo = createFilledBeadGeometry(store.beadSize)
   const hollowMats = createEvaHollowMaterials()
@@ -141,6 +142,51 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     'position:absolute;left:0;top:0;width:150px;height:auto;pointer-events:none;' +
     'transform:translate(-50%,-50%);display:none;z-index:2;'
   container.appendChild(ironImg)
+
+  // 视角操作提示（进入视角调整拖拽时弹出，自动消失；pointer-events:none 不挡拖拽）
+  const viewHint = document.createElement('div')
+  viewHint.innerHTML =
+    '<div style="font-size:13px;font-weight:600">WASD 可以移动 · 按住鼠标左键可以调整视角</div>' +
+    '<div style="font-size:11px;opacity:.8;margin-top:4px">调整好后点「设计」按钮继续放豆（视角保持不变）</div>'
+  viewHint.style.cssText =
+    'position:absolute;top:26px;left:50%;transform:translateX(-50%);padding:10px 18px;' +
+    'background:rgba(42,45,50,0.92);color:#fff;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.28);' +
+    'text-align:center;white-space:nowrap;pointer-events:none;display:none;opacity:0;transition:opacity .25s;z-index:5;'
+  container.appendChild(viewHint)
+  let hintTimer: ReturnType<typeof setTimeout> | undefined
+
+  function showViewHint() {
+    viewHint.style.display = 'block'
+    viewHint.style.opacity = '1'
+    clearTimeout(hintTimer)
+    hintTimer = setTimeout(() => {
+      viewHint.style.opacity = '0'
+      // 隐藏定时器也记入 hintTimer：拖拽中再次显示时能清掉，避免新提示被过早隐藏
+      hintTimer = setTimeout(() => {
+        viewHint.style.display = 'none'
+      }, 260)
+    }, 2600)
+  }
+
+  /** WASD 平移视角：W/S 沿视线方向前后、A/D 沿屏幕左右（跟随当前 yaw），步长≈屏幕 12px */
+  function onKeyDown(e: KeyboardEvent) {
+    const t = e.target as HTMLElement | null
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    if (store.mode !== 'design' || store.showSavePanel) return
+    const fwd = e.code === 'KeyW' ? 1 : e.code === 'KeyS' ? -1 : 0
+    const strafe = e.code === 'KeyD' ? 1 : e.code === 'KeyA' ? -1 : 0
+    if (fwd === 0 && strafe === 0) return
+    e.preventDefault()
+    const { w } = viewportSize()
+    const pr = groundPoint(1, 0)!
+    const pl = groundPoint(-1, 0)!
+    const step = Math.max(1e-6, (pr.x - pl.x) / w) * 12
+    center.x += (fwd * -Math.sin(yaw) + strafe * Math.cos(yaw)) * step
+    center.z += (fwd * -Math.cos(yaw) + strafe * -Math.sin(yaw)) * step
+    applyView()
+    ensureGridFitsViewport()
+  }
 
   // 视口状态：缩放倍率 + 相机注视的地面中心（世界单位）
   let scale = 1
@@ -334,9 +380,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     scene.add(patternMesh)
   }
 
-  /* ---------- 交互：放豆 / 擦除 / 悬停 / 锚点缩放 / 拖拽平移 / 视角旋转 ---------- */
+  /* ---------- 交互：放豆 / 擦除 / 悬停 / 锚点缩放 / WASD 移动 / 视角拖拽旋转 ---------- */
 
-  let panDrag: { sx: number; sy: number; cx: number; cz: number } | null = null
   let rotDrag: { sx: number; sy: number; yaw0: number; pitch0: number } | null = null
 
   function onPointerDown(e: PointerEvent) {
@@ -349,10 +394,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     store.mouse.down = true
     if (store.mode !== 'design' || e.button !== 0) return
     if (store.viewMode) {
-      // 视角工具：左键拖拽旋转相机（panMode 与之互斥，由侧栏开关保证）
+      // 视角工具：左键拖拽旋转相机；首次拖拽弹出操作提示
       rotDrag = { sx: e.clientX, sy: e.clientY, yaw0: yaw, pitch0: pitch }
-    } else if (store.panMode) {
-      panDrag = { sx: e.clientX, sy: e.clientY, cx: center.x, cz: center.z }
+      showViewHint()
     } else {
       placeBead(p.x * CELL, p.z * CELL)
     }
@@ -375,33 +419,17 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       ensureGridFitsViewport()
       return
     }
-    if (panDrag) {
-      const { w, h } = viewportSize()
-      const pl = groundPoint(-1, 0)!
-      const pr = groundPoint(1, 0)!
-      const pt = groundPoint(0, -1)!
-      const pb = groundPoint(0, 1)!
-      const perpxX = (pr.x - pl.x) / w
-      const perpxZ = (pb.z - pt.z) / h
-      center.x = panDrag.cx - (e.clientX - panDrag.sx) * perpxX
-      center.z = panDrag.cz - (e.clientY - panDrag.sy) * perpxZ
-      applyView()
-      ensureGridFitsViewport()
-      return
-    }
     // 设计模式按住拖拽连续放豆/擦除（placeBead 仅在内容实际变化时递增 gridVersion）
     if (store.mode === 'design' && !store.viewMode && store.mouse.down) placeBead(p.x * CELL, p.z * CELL)
   }
 
   function onPointerUp() {
     rotDrag = null
-    panDrag = null
     store.mouse.down = false
   }
 
   function onLeave() {
     rotDrag = null
-    panDrag = null
     store.mouse.x = -1
     store.mouse.y = -1
     store.mouse.down = false
@@ -548,6 +576,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     renderer.dispose()
     renderer.domElement.remove()
     ironImg.remove()
+    viewHint.remove()
+    clearTimeout(hintTimer)
     hollowGeo.dispose()
     filledGeo.dispose()
     lineGeo.dispose()
@@ -558,6 +588,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     el.removeEventListener('pointerdown', onPointerDown)
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
+    window.removeEventListener('keydown', onKeyDown)
     container.removeEventListener('pointerleave', onLeave)
     el.removeEventListener('wheel', onWheel)
     el.removeEventListener('contextmenu', onContext)
@@ -569,6 +600,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   el.addEventListener('pointerdown', onPointerDown)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('keydown', onKeyDown)
   container.addEventListener('pointerleave', onLeave)
   el.addEventListener('wheel', onWheel, { passive: false })
   el.addEventListener('contextmenu', onContext)

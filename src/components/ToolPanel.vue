@@ -18,22 +18,14 @@ function isModeDisabled(m: Mode) {
   return m === 'ironing' && !hasBeads
 }
 
-/** 拖拽平移与完成（旋转查看）模式互斥：开启一个即关闭另一个 */
-function togglePan(v: boolean) {
-  store.panMode = v
-  if (v) store.viewMode = false
-}
-
-/** 完成（展示）模式：隐藏棋盘线 + 左键拖拽旋转查看成品，与拖拽平移互斥 */
+/** 视角工具：隐藏棋盘线，左键拖拽旋转视角、WASD 移动视角；再点或点「设计」退出，视角保持不变可继续放豆 */
 function toggleView(v: boolean) {
   store.viewMode = v
-  if (v) store.panMode = false
-  // 从熨烫模式进入完成模式：直接切回设计（不走 switchMode，避免清空熨烫成果的熔融度）
-  if (v && store.mode === 'ironing') {
-    store.mode = 'design'
-    store.panMode = false
-  }
-  showStatus(v ? '已完成：隐藏棋盘线，拖拽旋转查看成品' : '回到设计：显示棋盘线，可继续放豆')
+  // 从熨烫模式进入视角工具：直接切回设计（不走 switchMode，避免清空熨烫成果的熔融度）
+  if (v && store.mode === 'ironing') store.mode = 'design'
+  showStatus(
+    v ? '视角调整：按住左键拖拽旋转视角，WASD 移动视角，调整好点「设计」继续放豆' : '回到设计：视角已保留，可继续放豆',
+  )
 }
 
 function onFileChange(e: Event) {
@@ -58,19 +50,10 @@ function onFileChange(e: Event) {
     />
 
     <ToggleButton
-      :model-value="store.panMode"
-      class="mode-btn"
-      :disabled="store.mode !== 'design'"
-      on-label="拖拽"
-      off-label="拖拽"
-      @update:model-value="togglePan"
-    />
-
-    <ToggleButton
       :model-value="store.viewMode"
       class="mode-btn"
-      on-label="完成"
-      off-label="完成"
+      on-label="视角"
+      off-label="视角"
       @update:model-value="toggleView"
     />
 
