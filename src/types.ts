@@ -28,7 +28,7 @@ export interface IronProgress {
   label: string
 }
 
-/** 保存在作品面板上的一个成品 */
+/** 已保存的一幅作品（点「恢复」列表取回，无拖拽/旋转/缩放姿态） */
 export interface SavedBoard {
   id: string
   /** 自动生成的作品名，如「作品 1」 */
@@ -39,11 +39,4 @@ export interface SavedBoard {
   /** 缩略图 PNG dataURL */
   thumb: string
   savedAt: number
-  /** 贴在墙上的 CSS 像素坐标（相对墙面左上角） */
-  x: number
-  y: number
-  /** 旋转角度（度），0 = 正立 */
-  rotation: number
-  /** 缩放倍率（0.5~3），1 = 原尺寸 */
-  scale: number
 }

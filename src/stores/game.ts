@@ -1,7 +1,6 @@
 import { computed, reactive } from 'vue'
 import type { BeadSize, Cell, IronProgress, Mode, MouseState, SavedBoard } from '../types'
 import { CELL, COLORS } from '../utils/color'
-import { rotForId } from '../utils/rotation'
 import { renderThumb } from '../utils/thumbnail'
 
 const STORAGE_KEY = 'bead-iron.savedBoards'
@@ -9,29 +8,22 @@ const STORAGE_KEY = 'bead-iron.savedBoards'
 /** 网格上限（防止极端缩放下内存/遍历失控） */
 export const MAX_GRID = 200
 
-/** 重新生成缩略图（当前 renderThumb 规则），用于旧数据迁移 */
-function regenerateThumb(grid: Cell[][]): string {
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  if (ctx) renderThumb(ctx, grid)
-  return canvas.toDataURL('image/png')
-}
-
-/** 从 localStorage 读取已保存的作品（容错：损坏/不可用时返回空列表） */
+/** 从 localStorage 读取已保存的作品（容错：损坏/不可用时返回空列表，兼容旧冰箱贴数据） */
 function loadSavedBoards(): SavedBoard[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const list = JSON.parse(raw)
     if (!Array.isArray(list)) return []
-    // 统一迁移：重新生成透明背景缩略图 + 缺失的 x/y 位置补默认落点 + rotation/scale 补默认值
-    return (list as SavedBoard[]).map((b, i) => ({
-      ...b,
-      thumb: regenerateThumb(b.grid),
-      x: typeof b.x === 'number' ? b.x : 20 + (i % 4) * 132,
-      y: typeof b.y === 'number' ? b.y : 20 + Math.floor(i / 4) * 122,
-      rotation: typeof b.rotation === 'number' ? b.rotation : rotForId(b.id),
-      scale: typeof b.scale === 'number' ? b.scale : 1,
+    // 只取核心字段，忽略旧的 x/y/rotation/scale 姿态
+    return (list as SavedBoard[]).map((b) => ({
+      id: b.id,
+      name: typeof b.name === 'string' ? b.name : '作品',
+      cols: b.cols,
+      rows: b.rows,
+      grid: b.grid,
+      thumb: typeof b.thumb === 'string' ? b.thumb : '',
+      savedAt: typeof b.savedAt === 'number' ? b.savedAt : 0,
     }))
   } catch {
     return []
@@ -112,10 +104,10 @@ export const store = reactive({
   } as IronProgress,
   /** 窗口 resize 后 +1，通知画布/3D 重新适配 */
   resizeTick: 0,
-  /** 已保存到作品面板的成品（localStorage 持久化） */
+  /** 已保存的作品列表（localStorage 持久化，点「恢复」展示） */
   savedBoards: loadSavedBoards(),
-  /** 作品面板显示开关（覆盖在画布上） */
-  showBoardPanel: false,
+  /** 作品列表显示开关（覆盖在画布上） */
+  showSavePanel: false,
   /** 本次启动从自动存档恢复了上次进度（用于提示） */
   restoredFromAutosave: autosave !== null,
 })
@@ -260,9 +252,9 @@ export function toggleEraser() {
   store.isEraser = !store.isEraser
 }
 
-/* ---------- 作品面板（localStorage 持久化） ---------- */
+/* ---------- 作品存档（可保存多幅，点「恢复」列表取回） ---------- */
 
-/** 把当前画布保存为一件作品（含缩略图），并打开面板即时反馈 */
+/** 把当前画布保存为一幅新作品（自动命名 + 缩略图），并打开列表即时反馈 */
 export function saveBoard() {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const name = `作品 ${store.savedBoards.length + 1}`
@@ -271,8 +263,6 @@ export function saveBoard() {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   if (ctx) renderThumb(ctx, grid)
-  // 初始落点：按已有数量错落排布（间距大于磁贴尺寸，避免叠压），之后可自由拖拽
-  const n = store.savedBoards.length
   store.savedBoards.push({
     id,
     name,
@@ -281,17 +271,13 @@ export function saveBoard() {
     grid,
     thumb: canvas.toDataURL('image/png'),
     savedAt: Date.now(),
-    x: 24 + (n % 4) * 132,
-    y: 24 + Math.floor(n / 4) * 122,
-    rotation: rotForId(id),
-    scale: 1,
   })
   persistBoards()
-  store.showBoardPanel = true
-  showStatus(`已保存「${name}」到作品墙`)
+  store.showSavePanel = true
+  showStatus(`已保存「${name}」`)
 }
 
-/** 把面板中的一件作品整表载入画布（保留熔融度，不走 switchMode） */
+/** 把列表中的一幅作品整表载入画布（保留熔融度，不走 switchMode） */
 export function loadBoard(id: string) {
   const board = store.savedBoards.find((b) => b.id === id)
   if (!board) return
@@ -300,7 +286,7 @@ export function loadBoard(id: string) {
   store.grid = board.grid.map((row) => row.map((cell) => ({ ...cell })))
   store.gridVersion++
   store.mode = 'design' // 直接赋值：避免 switchMode 清零 melt
-  store.showBoardPanel = false
+  store.showSavePanel = false
   showStatus(`已载入「${board.name}」`)
 }
 
@@ -309,19 +295,8 @@ export function deleteBoard(id: string) {
   persistBoards()
 }
 
-/** 拖拽/旋转/缩放结束后，更新冰箱贴在墙上的姿态（位置/角度/缩放）并持久化 */
-export function updateBoard(id: string, patch: Partial<Pick<SavedBoard, 'x' | 'y' | 'rotation' | 'scale'>>) {
-  const board = store.savedBoards.find((b) => b.id === id)
-  if (!board) return
-  if (typeof patch.x === 'number') board.x = Math.max(0, Math.round(patch.x))
-  if (typeof patch.y === 'number') board.y = Math.max(0, Math.round(patch.y))
-  if (typeof patch.rotation === 'number') board.rotation = patch.rotation
-  if (typeof patch.scale === 'number') board.scale = patch.scale
-  persistBoards()
-}
-
-export function setBoardPanel(show: boolean) {
-  store.showBoardPanel = show
+export function setSavePanel(show: boolean) {
+  store.showSavePanel = show
 }
 
 /* ---------- 自动保存（每 5 秒 + 关页面前，防止误触/刷新丢豆子） ---------- */

@@ -2,7 +2,7 @@
 import { useTemplateRef } from 'vue'
 import { Button, ToggleButton } from 'primevue'
 import { importImage } from '../composables/useImageImport'
-import { clearAll, hasBeads, saveBoard, setBoardPanel, showStatus, store, switchMode } from '../stores/game'
+import { clearAll, hasBeads, saveBoard, setSavePanel, showStatus, store, switchMode } from '../stores/game'
 import type { Mode } from '../types'
 
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
@@ -96,13 +96,13 @@ function onFileChange(e: Event) {
     />
 
     <Button
-      label="面板"
-      icon="pi pi-images"
+      label="恢复"
+      icon="pi pi-undo"
       fluid
       variant="outlined"
       severity="info"
       class="mode-btn"
-      @click="setBoardPanel(true)"
+      @click="setSavePanel(true)"
     />
 
     <Button

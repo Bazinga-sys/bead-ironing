@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef } from 'vue'
 import { setupGrid, showStatus, startAutosave, stopAutosave, store } from '../stores/game'
-import BoardPanel from './BoardPanel.vue'
 import IronProgress from './IronProgress.vue'
 import PixelCanvas from './PixelCanvas.vue'
+import SavePanel from './SavePanel.vue'
 import StatusBar from './StatusBar.vue'
 
 const root = useTemplateRef<HTMLDivElement>('root')
@@ -39,7 +39,7 @@ onUnmounted(() => {
 <template>
   <div ref="root" class="canvas-wrap">
     <PixelCanvas />
-    <BoardPanel />
+    <SavePanel />
     <StatusBar />
     <IronProgress />
   </div>
