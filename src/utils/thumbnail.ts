@@ -11,7 +11,7 @@ import { shade } from './color'
 export function renderThumb(
   ctx: CanvasRenderingContext2D,
   grid: Cell[][],
-  maxSize = 96,
+  maxSize = 192,
 ) {
   const rows = grid.length
   const cols = grid[0]?.length ?? 0
@@ -34,7 +34,8 @@ export function renderThumb(
   }
   const cw = maxC - minC + 1
   const ch = maxR - minR + 1
-  const scale = Math.max(6, Math.min(14, Math.round(maxSize / Math.max(cw, ch))))
+  // 高分辨率：保证图案最长边接近 maxSize，且每格至少 8px、最多 24px（列表缩略图显示放大也不糊）
+  const scale = Math.max(8, Math.min(24, Math.round(maxSize / Math.max(cw, ch))))
   ctx.canvas.width = cw * scale
   ctx.canvas.height = ch * scale
   for (let r = minR; r <= maxR; r++) {

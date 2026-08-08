@@ -8,6 +8,14 @@ const STORAGE_KEY = 'bead-iron.savedBoards'
 /** 网格上限（防止极端缩放下内存/遍历失控） */
 export const MAX_GRID = 200
 
+/** 生成作品缩略图 PNG dataURL（离屏 canvas，当前 renderThumb 规则） */
+function regenerateThumb(grid: Cell[][]): string {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (ctx) renderThumb(ctx, grid)
+  return canvas.toDataURL('image/png')
+}
+
 /** 从 localStorage 读取已保存的作品（容错：损坏/不可用时返回空列表，兼容旧冰箱贴数据） */
 function loadSavedBoards(): SavedBoard[] {
   try {
@@ -15,14 +23,15 @@ function loadSavedBoards(): SavedBoard[] {
     if (!raw) return []
     const list = JSON.parse(raw)
     if (!Array.isArray(list)) return []
-    // 只取核心字段，忽略旧的 x/y/rotation/scale 姿态
+    // 只取核心字段，忽略旧的 x/y/rotation/scale 姿态；
+    // 缩略图统一按当前高清规则重新生成（旧数据分辨率低，升级避免放大发糊）
     return (list as SavedBoard[]).map((b) => ({
       id: b.id,
       name: typeof b.name === 'string' ? b.name : '作品',
       cols: b.cols,
       rows: b.rows,
       grid: b.grid,
-      thumb: typeof b.thumb === 'string' ? b.thumb : '',
+      thumb: regenerateThumb(b.grid),
       savedAt: typeof b.savedAt === 'number' ? b.savedAt : 0,
     }))
   } catch {
@@ -259,17 +268,13 @@ export function saveBoard() {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const name = `作品 ${store.savedBoards.length + 1}`
   const grid = store.grid.map((row) => row.map((cell) => ({ ...cell })))
-  // 离屏 canvas 生成缩略图 PNG（裁剪到图案边界，透明背景）
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  if (ctx) renderThumb(ctx, grid)
   store.savedBoards.push({
     id,
     name,
     cols: store.cols,
     rows: store.rows,
     grid,
-    thumb: canvas.toDataURL('image/png'),
+    thumb: regenerateThumb(grid),
     savedAt: Date.now(),
   })
   persistBoards()

@@ -13,7 +13,7 @@ export const BEAD_SCALE: Record<BeadSize, { s: number; hole: number; tol: number
 }
 
 /** 珠体高度系数：无熔融时珠高 = 规格比例 s × 此系数（熔融时按 1−0.92×melt 压扁） */
-export const BEAD_HEIGHT = 1.35
+export const BEAD_HEIGHT = 2.0
 
 /**
  * 空心珠几何体（EVA 空心短圆筒）：圆环拉伸（高细分、圆润边缘），俯视可见贯穿珠孔。
@@ -27,10 +27,8 @@ export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeG
   ringShape.holes.push(hp)
   const geo = new THREE.ExtrudeGeometry(ringShape, {
     depth: 0.55,
-    bevelEnabled: true,
-    bevelThickness: 0.09,
-    bevelSize: 0.09,
-    bevelSegments: 4,
+    // 不开 bevel：真实 EVA 拼豆是锐利直角切面的中空短管，无内外倒角
+    bevelEnabled: false,
     curveSegments: 32,
   })
   geo.center()
@@ -62,10 +60,8 @@ export function createFilledBeadGeometry(_size: BeadSize = 'big'): THREE.Extrude
   rrect.holes.push(hp)
   const geo = new THREE.ExtrudeGeometry(rrect, {
     depth: 1,
-    bevelEnabled: true,
-    bevelThickness: 0.08,
-    bevelSize: 0.08,
-    bevelSegments: 4,
+    // 不开 bevel：熔融扁珠的切面同样锐利（俯视圆角矩形仅表示熨烫融合轮廓）
+    bevelEnabled: false,
     curveSegments: 32,
   })
   geo.center()
@@ -74,32 +70,100 @@ export function createFilledBeadGeometry(_size: BeadSize = 'big'): THREE.Extrude
 }
 
 /**
- * EVA 空心珠材质：哑光雾面（高粗糙度、无清漆高光），轻微雾面透光——
- * 对应真实 EVA 豆「哑光、色彩鲜艳、丢水里浮起来」的外观，区别于亮面 PE。
+ * EVA 表面粗糙度噪声贴图（程序化 value noise，乘法工作流）：
+ * base roughness 恒为 1，贴图 green 通道直接承载最终粗糙度——
+ * 模拟注塑细微纹理，避免纯色材质在环境高光下显得"死板"。
+ * - hollow（未熨烫）：0.70 ± 0.05 均匀波动（EVA 原生哑光，高光大而虚）
+ * - filled（熨烫后）：0.62–0.68 为主，随机熔接斑块局部降到 0.45–0.55（略光滑、轻微发亮）
+ */
+function createRoughnessMap(opts: { center: number; spread: number; glossySpots?: boolean }): THREE.CanvasTexture {
+  const SIZE = 128
+  const G = 8 // 低分辨率随机网格 + 双线性插值 → 平滑噪声
+  const grid = new Float32Array((G + 1) * (G + 1))
+  for (let i = 0; i < grid.length; i++) grid[i] = Math.random()
+  const smooth = (t: number) => t * t * (3 - 2 * t)
+  const canvas = document.createElement('canvas')
+  canvas.width = SIZE
+  canvas.height = SIZE
+  const ctx = canvas.getContext('2d')!
+  const img = ctx.createImageData(SIZE, SIZE)
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const gx = (x / SIZE) * G
+      const gy = (y / SIZE) * G
+      const x0 = Math.floor(gx)
+      const y0 = Math.floor(gy)
+      const fx = smooth(gx - x0)
+      const fy = smooth(gy - y0)
+      const v =
+        (grid[y0 * (G + 1) + x0] * (1 - fx) + grid[y0 * (G + 1) + x0 + 1] * fx) * (1 - fy) +
+        (grid[(y0 + 1) * (G + 1) + x0] * (1 - fx) + grid[(y0 + 1) * (G + 1) + x0 + 1] * fx) * fy
+      const r = opts.center + (v - 0.5) * 2 * opts.spread
+      const g = Math.round(Math.max(0, Math.min(1, r)) * 255)
+      const i = (y * SIZE + x) * 4
+      img.data[i] = g
+      img.data[i + 1] = g
+      img.data[i + 2] = g
+      img.data[i + 3] = 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+  // 熨烫后：随机熔接斑块略微变光滑（粗糙度 0.45–0.55，即比基础 0.65 更暗）
+  if (opts.glossySpots) {
+    const baseG = Math.round(opts.center * 255)
+    const spots = 6
+    for (let s = 0; s < spots; s++) {
+      const cx = Math.random() * SIZE
+      const cy = Math.random() * SIZE
+      const r = 8 + Math.random() * 14
+      const col = Math.round((0.45 + Math.random() * 0.1) * 255)
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+      grad.addColorStop(0, `rgb(${col},${col},${col})`)
+      grad.addColorStop(1, `rgba(${baseG},${baseG},${baseG},0)`)
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(4, 4) // 单颗豆表面多次周期，弱化跨豆纹理重复感
+  return tex
+}
+
+/**
+ * EVA 空心珠材质（未熨烫原生 EVA，哑光软塑料）：
+ * 金属度 0 / 粗糙度 0.70±0.05 / IOR 1.46 / 极微弱半透（transmission 0.08）。
+ * 高光模糊、范围大，几乎看不清清晰反射；与亮面 PE（roughness 0.4–0.5）明显区分。
  */
 export function createEvaHollowMaterial(): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
-    roughness: 0.92,
+    roughness: 1, // 乘法工作流：实际值由 roughnessMap 承载
+    roughnessMap: createRoughnessMap({ center: 0.7, spread: 0.05 }),
     metalness: 0,
     clearcoat: 0,
-    transmission: 0.2,
-    ior: 1.5,
-    thickness: 2.5,
+    transmission: 0.08,
+    ior: 1.46,
+    thickness: 1.2,
     envMapIntensity: 1.0,
   })
 }
 
 /**
- * EVA 熔融扁珠材质：熨烫后更哑光、更不透明（雾面感明显），透光进一步减弱。
+ * EVA 熔融扁珠材质（熨烫完成后的成品）：
+ * 大部分区域保持 0.62–0.68 哑光，局部熔接处轻微变光滑发亮（0.45–0.55）；
+ * 比未熨烫更不透光，仍无金属感。
  */
 export function createEvaFilledMaterial(): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
-    roughness: 0.95,
+    roughness: 1, // 乘法工作流：实际值由 roughnessMap 承载
+    roughnessMap: createRoughnessMap({ center: 0.65, spread: 0.03, glossySpots: true }),
     metalness: 0,
     clearcoat: 0,
-    transmission: 0.08,
-    ior: 1.5,
-    thickness: 3,
-    envMapIntensity: 0.9,
+    transmission: 0.03,
+    ior: 1.46,
+    thickness: 1.5,
+    envMapIntensity: 0.95,
   })
 }
